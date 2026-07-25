@@ -1,18 +1,6 @@
-const firebaseConfig = {
-  apiKey: "AIzaSyAl-LuxyjTr-veAiftzJxyZA7lK4y9UA6s",
-  authDomain: "pioneering-flag-453005-g5.firebaseapp.com",
-  projectId: "pioneering-flag-453005-g5",
-  storageBucket: "pioneering-flag-453005-g5.firebasestorage.app",
-  messagingSenderId: "1009940089106",
-  appId: "1:1009940089106:web:ff4cd307470aad29854bcb",
-  measurementId: "G-DSCH8MPTGY"
-};
-firebase.initializeApp(firebaseConfig);
-const fbAuth = firebase.auth();
-
 /* ---------------------------------- */
 
-/* ---------- Auth (real Firebase Phone OTP login) ---------- */
+/* ---------- Auth (real OTP via Fast2SMS, through our own /api backend) ---------- */
 function getAccount(){
   try {
     const raw = localStorage.getItem('bp_account');
@@ -40,18 +28,12 @@ function showApp(){
   appEl.classList.add('ready');
 }
 
-let confirmationResult = null;
+let otpToken = null; // signed token returned by /api/send-otp, needed to verify
 
 const existingAccount = getAccount();
 if (existingAccount){
   showApp();
 } else {
-  // Invisible reCAPTCHA — Firebase needs this to confirm a real browser
-  // is requesting the SMS, so it can't be abused to spam numbers.
-  window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
-    size: 'invisible'
-  });
-
   sendOtpBtn.addEventListener('click', () => {
     const val = phoneInput.value.trim();
     if (!/^[6-9]\d{9}$/.test(val)){
@@ -62,10 +44,15 @@ if (existingAccount){
     sendOtpBtn.disabled = true;
     sendOtpBtn.textContent = 'Sending OTP...';
 
-    const fullNumber = '+91' + val;
-    firebase.auth().signInWithPhoneNumber(fullNumber, window.recaptchaVerifier)
-      .then((result) => {
-        confirmationResult = result;
+    fetch('/api/send-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ phone: val })
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.token) throw new Error(data.error || 'Failed to send OTP');
+        otpToken = data.token;
         otpLabel.textContent = `Enter the OTP sent to +91 ${val}`;
         stepPhone.style.display = 'none';
         stepOtp.style.display = 'block';
@@ -91,7 +78,7 @@ if (existingAccount){
 
   verifyOtpBtn.addEventListener('click', () => {
     const otp = otpInput.value.trim();
-    if (otp.length !== 6 || !confirmationResult){
+    if (otp.length !== 6 || !otpToken){
       otpError.textContent = 'Enter the 6-digit OTP';
       otpError.style.display = 'block';
       return;
@@ -99,19 +86,23 @@ if (existingAccount){
     verifyOtpBtn.disabled = true;
     verifyOtpBtn.textContent = 'Verifying...';
 
-    confirmationResult.confirm(otp)
-      .then((result) => {
-        const account = {
-          phone: phoneInput.value.trim(),
-          uid: result.user.uid,
-          createdAt: Date.now()
-        };
+    fetch('/api/verify-otp', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token: otpToken, otp })
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (!data.success) throw new Error(data.error || 'Verification failed');
+        const account = { phone: data.phone, createdAt: Date.now() };
         localStorage.setItem('bp_account', JSON.stringify(account));
         showApp();
       })
       .catch((error) => {
         console.error(error);
-        otpError.textContent = 'Wrong OTP, please try again.';
+        otpError.textContent = error.message === 'OTP expired, please request a new one'
+          ? error.message
+          : 'Wrong OTP, please try again.';
         otpError.style.display = 'block';
       })
       .finally(() => {
