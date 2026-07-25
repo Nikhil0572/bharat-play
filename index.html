@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="hi">
+<html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -9,153 +9,967 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Bharat Play">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="icon-192.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="style.css">
+<style>
+  :root{
+    --bg: #07070a;
+    --saffron: #FF9933;
+    --white: #FFFFFF;
+    --green: #128807;
+    --chakra: #0B1F6B;
+    --heart: #FF3B5C;
+    --text-dim: rgba(255,255,255,0.72);
+    --text-faint: rgba(255,255,255,0.45);
+  }
+  *{box-sizing:border-box; margin:0; padding:0;}
+  html,body{
+    height:100%;
+    background:var(--bg);
+    font-family:'Inter',sans-serif;
+    overflow:hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+  #app{
+    position:relative;
+    width:100%;
+    height:100vh;
+    max-width:480px;
+    margin:0 auto;
+    background:#000;
+    overflow:hidden;
+    box-shadow: 0 0 60px rgba(0,0,0,0.6);
+    display:none;
+  }
+  #app.ready{ display:block; }
+
+  /* Top bar */
+  .topbar{
+    position:absolute; top:0; left:0; right:0;
+    z-index:20;
+    display:flex; align-items:center; justify-content:space-between;
+    padding: 16px 16px 10px;
+    background: linear-gradient(to bottom, rgba(0,0,0,0.55), rgba(0,0,0,0));
+    pointer-events:none;
+  }
+  .logo{
+    display:flex; align-items:center; gap:8px;
+    pointer-events:auto;
+  }
+  .logo-mark{
+    width:26px; height:26px;
+    border-radius:50%;
+    background: conic-gradient(var(--saffron) 0deg 120deg, var(--white) 120deg 240deg, var(--green) 240deg 360deg);
+    display:flex; align-items:center; justify-content:center;
+    box-shadow: 0 0 0 2px rgba(255,255,255,0.15);
+  }
+  .logo-mark::after{
+    content:"";
+    width:9px; height:9px;
+    background:var(--bg);
+    border-radius:50%;
+  }
+  .logo-text{
+    font-family:'Poppins',sans-serif;
+    font-weight:800;
+    font-size:18px;
+    letter-spacing:0.2px;
+    color:var(--white);
+  }
+  .logo-text span{
+    background: linear-gradient(90deg, var(--saffron), var(--white) 50%, var(--green));
+    -webkit-background-clip:text;
+    background-clip:text;
+    -webkit-text-fill-color:transparent;
+  }
+  .tab-row{
+    display:flex; gap:18px;
+    pointer-events:auto;
+  }
+  .tab{
+    font-size:15px; font-weight:600;
+    color:var(--text-faint);
+    position:relative; padding-bottom:4px;
+  }
+  .tab.active{ color:var(--white); }
+  .tab.active::after{
+    content:"";
+    position:absolute; bottom:0; left:0; right:0;
+    height:2px; border-radius:2px;
+    background: linear-gradient(90deg, var(--saffron), var(--white), var(--green));
+  }
+
+  /* Reels feed */
+  .feed{
+    height:100%; width:100%;
+    overflow-y:scroll;
+    scroll-snap-type:y mandatory;
+    scrollbar-width:none;
+  }
+  .feed::-webkit-scrollbar{display:none;}
+
+  .reel{
+    position:relative;
+    height:100vh; width:100%;
+    scroll-snap-align:start;
+    display:flex; align-items:center; justify-content:center;
+    background:#000;
+    overflow:hidden;
+  }
+  .reel video{
+    width:100%; height:100%;
+    object-fit:cover;
+    background:#000;
+  }
+  .reel-shade{
+    position:absolute; left:0; right:0; bottom:0;
+    height:45%;
+    background: linear-gradient(to top, rgba(0,0,0,0.85), rgba(0,0,0,0));
+    pointer-events:none;
+  }
+
+  /* Right action rail */
+  .rail{
+    position:absolute; right:10px; bottom:110px;
+    z-index:15;
+    display:flex; flex-direction:column; align-items:center; gap:22px;
+  }
+  .rail-item{ display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .rail-btn{
+    width:46px; height:46px;
+    border-radius:50%;
+    background: rgba(255,255,255,0.08);
+    backdrop-filter: blur(6px);
+    display:flex; align-items:center; justify-content:center;
+    border:1px solid rgba(255,255,255,0.12);
+    transition: transform 0.15s ease;
+  }
+  .rail-btn:active{ transform: scale(0.88); }
+  .rail-btn svg{ width:23px; height:23px; }
+  .rail-count{
+    font-size:12px; font-weight:600; color:var(--white);
+    text-shadow:0 1px 3px rgba(0,0,0,0.6);
+  }
+  .rail-avatar{
+    width:42px; height:42px; border-radius:50%;
+    padding:2px;
+    background: conic-gradient(var(--saffron), var(--white), var(--green), var(--saffron));
+    margin-bottom:4px;
+  }
+  .rail-avatar img{
+    width:100%; height:100%; border-radius:50%;
+    object-fit:cover;
+    border:2px solid #000;
+  }
+  .liked svg path{ fill:var(--heart); stroke:var(--heart); }
+  .liked .rail-btn{ animation: pop 0.35s ease; }
+  @keyframes pop{ 0%{transform:scale(1);} 40%{transform:scale(1.25);} 100%{transform:scale(1);} }
+
+  /* Bottom info */
+  .info{
+    position:absolute; left:14px; right:80px; bottom:24px;
+    z-index:15;
+    color:var(--white);
+  }
+  .username{
+    display:flex; align-items:center; gap:8px;
+    font-weight:700; font-size:15px;
+    margin-bottom:6px;
+  }
+  .username .tag{
+    font-size:11px; font-weight:600;
+    padding:2px 8px; border-radius:20px;
+    background: linear-gradient(90deg, rgba(255,153,51,0.25), rgba(19,136,8,0.25));
+    border:1px solid rgba(255,255,255,0.2);
+    color:var(--white);
+  }
+  .follow-btn{
+    font-size:12px; font-weight:700;
+    border:1px solid var(--white);
+    border-radius:6px;
+    padding:3px 10px;
+    background:transparent; color:var(--white);
+  }
+  .caption{
+    font-size:13.5px; line-height:1.4;
+    color:var(--text-dim);
+    margin-bottom:8px;
+  }
+  .sound{
+    display:flex; align-items:center; gap:6px;
+    font-size:12px; color:var(--text-dim);
+  }
+  .sound-icon{
+    width:14px; height:14px; flex-shrink:0;
+    display:flex; align-items:center; justify-content:center;
+  }
+  .marquee-wrap{ overflow:hidden; max-width:200px; }
+  .marquee{
+    white-space:nowrap;
+    display:inline-block;
+    animation: scrollText 8s linear infinite;
+  }
+  @keyframes scrollText{
+    0%{ transform:translateX(0%); }
+    100%{ transform:translateX(-50%); }
+  }
+
+  /* mute toggle */
+  .mute-btn{
+    position:absolute; top:70px; right:12px; z-index:20;
+    width:34px; height:34px; border-radius:50%;
+    background:rgba(0,0,0,0.4);
+    border:1px solid rgba(255,255,255,0.2);
+    display:flex; align-items:center; justify-content:center;
+  }
+  .mute-btn svg{ width:16px; height:16px; }
+
+  /* progress dots at very top (chakra spin) */
+  .loading-hint{
+    position:absolute; inset:0;
+    display:flex; align-items:center; justify-content:center;
+    color:var(--text-faint); font-size:12px;
+    pointer-events:none;
+  }
+
+  /* Bottom nav */
+  .bottomnav{
+    position:absolute; left:0; right:0; bottom:0;
+    z-index:20;
+    display:flex; justify-content:space-around; align-items:center;
+    padding:10px 8px calc(10px + env(safe-area-inset-bottom));
+    background: linear-gradient(to top, rgba(0,0,0,0.75), rgba(0,0,0,0));
+  }
+  .nav-item{ display:flex; flex-direction:column; align-items:center; gap:3px; opacity:0.55; }
+  .nav-item.active{ opacity:1; }
+  .nav-item svg{ width:22px; height:22px; }
+  .nav-item span{ font-size:9.5px; color:var(--white); font-weight:600; }
+  .nav-create{
+    width:34px; height:26px;
+    border-radius:8px;
+    background: linear-gradient(90deg, var(--saffron), var(--white), var(--green));
+    display:flex; align-items:center; justify-content:center;
+  }
+  .nav-create svg{ width:16px; height:16px; }
+
+  @media (min-width:481px){
+    body{ display:flex; align-items:center; justify-content:center; background:#111; }
+  }
+
+  /* Bottom sheet (comments / share / more) */
+  .sheet-overlay{
+    position:fixed; inset:0; z-index:100;
+    background:rgba(0,0,0,0.55);
+    display:none;
+    align-items:flex-end;
+    max-width:480px; margin:0 auto;
+  }
+  .sheet-overlay.open{ display:flex; }
+  .sheet{
+    width:100%;
+    max-height:70vh;
+    background:#141418;
+    border-radius:18px 18px 0 0;
+    padding:10px 18px 24px;
+    display:flex; flex-direction:column;
+    animation: slideUp 0.22s ease;
+  }
+  @keyframes slideUp{ from{ transform:translateY(100%); } to{ transform:translateY(0); } }
+  .sheet-handle{
+    width:38px; height:4px; border-radius:3px;
+    background:rgba(255,255,255,0.25);
+    margin:6px auto 14px;
+  }
+  .sheet-content{ color:var(--white); overflow-y:auto; }
+  .sheet-title{ font-weight:700; font-size:15px; margin-bottom:14px; }
+  .comment-row{ display:flex; gap:10px; margin-bottom:16px; align-items:flex-start; }
+  .comment-row img{ width:32px; height:32px; border-radius:50%; flex-shrink:0; }
+  .comment-user{ font-weight:600; font-size:13px; margin-bottom:2px; }
+  .comment-text{ font-size:13px; color:var(--text-dim); }
+  .share-grid{ display:flex; gap:18px; flex-wrap:wrap; margin-top:6px; }
+  .share-opt{ display:flex; flex-direction:column; align-items:center; gap:6px; width:64px; }
+  .share-circle{
+    width:52px; height:52px; border-radius:50%;
+    background:rgba(255,255,255,0.08);
+    display:flex; align-items:center; justify-content:center;
+    font-size:20px;
+  }
+  .share-opt span{ font-size:11px; color:var(--text-dim); text-align:center; }
+  .more-opt{
+    display:flex; align-items:center; gap:12px;
+    padding:13px 4px; font-size:14px; font-weight:500;
+    border-bottom:1px solid rgba(255,255,255,0.06);
+  }
+  .toast{
+    position:fixed; bottom:90px; left:50%; transform:translateX(-50%);
+    background:rgba(20,20,24,0.95); color:var(--white);
+    padding:10px 18px; border-radius:24px; font-size:13px; font-weight:600;
+    z-index:200; opacity:0; pointer-events:none; transition:opacity 0.25s ease;
+    max-width:80%; text-align:center;
+  }
+  .toast.show{ opacity:1; }
+
+  /* Full screen panels (Search / Create / Liked / Profile / Following) */
+  .screen-overlay{
+    position:fixed; inset:0; z-index:90;
+    max-width:480px; margin:0 auto;
+    background:var(--bg);
+    display:none;
+    flex-direction:column;
+  }
+  .screen-overlay.open{ display:flex; }
+  .screen-header{
+    display:flex; align-items:center; gap:14px;
+    padding:18px 16px 14px;
+    border-bottom:1px solid rgba(255,255,255,0.08);
+  }
+  .screen-back{
+    width:32px; height:32px; border-radius:50%;
+    background:rgba(255,255,255,0.08);
+    display:flex; align-items:center; justify-content:center;
+    border:none;
+  }
+  .screen-back svg{ width:18px; height:18px; }
+  .screen-title{ color:var(--white); font-weight:700; font-size:16px; }
+  .screen-body{ flex:1; overflow-y:auto; padding:20px 18px; color:var(--white); }
+  .empty-state{
+    display:flex; flex-direction:column; align-items:center; justify-content:center;
+    height:80%; text-align:center; gap:10px; color:var(--text-faint);
+  }
+  .empty-state .big{ font-size:40px; }
+  .empty-state .title{ color:var(--white); font-weight:700; font-size:15px; }
+  .empty-state .sub{ font-size:12.5px; max-width:260px; line-height:1.5; }
+  .search-input{
+    width:100%; background:rgba(255,255,255,0.08);
+    border:1px solid rgba(255,255,255,0.15);
+    border-radius:10px; padding:12px 14px;
+    color:var(--white); font-size:14px; margin-bottom:18px;
+  }
+  .search-input::placeholder{ color:var(--text-faint); }
+  .profile-top{ display:flex; flex-direction:column; align-items:center; margin-bottom:20px; }
+  .profile-top img{ width:80px; height:80px; border-radius:50%; border:2px solid var(--saffron); margin-bottom:10px; }
+  .profile-top .pname{ font-weight:700; font-size:15px; }
+  .profile-stats{ display:flex; gap:28px; margin:14px 0 4px; }
+  .profile-stats div{ text-align:center; }
+  .profile-stats b{ display:block; font-size:15px; }
+  .profile-stats span{ font-size:11px; color:var(--text-faint); }
+  .create-opt{
+    display:flex; align-items:center; gap:14px;
+    background:rgba(255,255,255,0.06);
+    border-radius:12px; padding:16px; margin-bottom:12px;
+  }
+  .create-opt .ic{ font-size:22px; }
+  .create-opt b{ display:block; font-size:14px; }
+  .create-opt span{ font-size:12px; color:var(--text-faint); }
+
+  /* Auth screen */
+  .auth-overlay{
+    position:fixed; inset:0; z-index:200;
+    max-width:480px; margin:0 auto;
+    background:var(--bg);
+    display:flex; flex-direction:column;
+    align-items:center; justify-content:center;
+    padding:32px 28px;
+  }
+  .auth-logo-mark{
+    width:56px; height:56px; border-radius:50%;
+    background: conic-gradient(var(--saffron) 0deg 120deg, var(--white) 120deg 240deg, var(--green) 240deg 360deg);
+    display:flex; align-items:center; justify-content:center;
+    margin-bottom:16px;
+  }
+  .auth-logo-mark::after{ content:""; width:20px; height:20px; background:var(--bg); border-radius:50%; }
+  .auth-title{ color:var(--white); font-size:26px; font-weight:800; font-family:'Poppins',sans-serif; margin-bottom:4px; }
+  .auth-title span{
+    background: linear-gradient(90deg, var(--saffron), var(--white) 50%, var(--green));
+    -webkit-background-clip:text; background-clip:text; -webkit-text-fill-color:transparent;
+  }
+  .auth-subtitle{ color:var(--text-dim); font-size:13px; margin-bottom:36px; text-align:center; }
+  .auth-label{ color:var(--text-dim); font-size:12.5px; align-self:flex-start; margin-bottom:8px; width:100%; }
+  .auth-input-row{
+    display:flex; align-items:center; width:100%;
+    border:1px solid rgba(255,255,255,0.2); border-radius:10px;
+    margin-bottom:18px;
+  }
+  .auth-prefix{ color:var(--white); padding:0 6px 0 14px; font-weight:600; border-right:1px solid rgba(255,255,255,0.15); margin-right:10px; }
+  .auth-input{
+    flex:1; background:none; border:none; outline:none;
+    color:var(--white); padding:14px 14px 14px 0; font-size:15px; letter-spacing:0.5px;
+  }
+  .auth-input::placeholder{ color:var(--text-faint); }
+  .auth-otp-input{
+    width:100%; border:1px solid rgba(255,255,255,0.2); border-radius:10px;
+    background:none; color:var(--white); padding:14px; font-size:20px;
+    letter-spacing:10px; text-align:center; margin-bottom:18px; outline:none;
+  }
+  .auth-btn{
+    width:100%; border:none; border-radius:10px; padding:14px;
+    background: linear-gradient(90deg, var(--saffron), #ffb066);
+    color:#1a0f00; font-weight:800; font-size:15px;
+  }
+  .auth-btn:disabled{ opacity:0.4; }
+  .auth-error{ color:#ff6b6b; font-size:12px; margin:-10px 0 14px; align-self:flex-start; }
+  .auth-back{ margin-top:16px; color:var(--text-dim); font-size:13px; font-weight:600; }
+  .auth-note{ color:var(--text-faint); font-size:11px; text-align:center; margin-top:28px; line-height:1.6; }
+  .auth-credit{ color:var(--text-faint); font-size:11px; text-align:center; margin-top:14px; }
+</style>
 </head>
 <body>
+
+<!-- Login / signup screen shown on first visit -->
+<div class="auth-overlay" id="authOverlay">
+  <div class="auth-logo-mark"></div>
+  <div class="auth-title">Bharat<span>Play</span></div>
+  <div class="auth-subtitle">Watch, create and share reels</div>
+
+  <div id="authStepPhone" style="width:100%;">
+    <div class="auth-label">Mobile number</div>
+    <div class="auth-input-row">
+      <span class="auth-prefix">+91</span>
+      <input class="auth-input" id="phoneInput" type="tel" inputmode="numeric" maxlength="10" placeholder="98765 43210">
+    </div>
+    <div class="auth-error" id="phoneError" style="display:none;">Enter a valid 10-digit mobile number</div>
+    <button class="auth-btn" id="sendOtpBtn">Send OTP</button>
+    <div id="recaptcha-container" style="margin-top:14px;"></div>
+  </div>
+
+  <div id="authStepOtp" style="width:100%; display:none;">
+    <div class="auth-label" id="otpLabel">Enter the OTP sent to +91 XXXXXXXXXX</div>
+    <input class="auth-otp-input" id="otpInput" type="tel" inputmode="numeric" maxlength="6" placeholder="------">
+    <div class="auth-error" id="otpError" style="display:none;">Enter the 6-digit OTP</div>
+    <button class="auth-btn" id="verifyOtpBtn">Verify &amp; Continue</button>
+    <div class="auth-back" id="changeNumberBtn">← Change number</div>
+  </div>
+
+  <div class="auth-note" id="authDemoNote">
+    This is a demo login — enter any 10-digit number, then use OTP <b>123456</b> to continue.
+  </div>
+  <div class="auth-credit">Bharat Play — founded &amp; owned by Nitin Sharma ✔</div>
+</div>
+
 <div id="app">
 
-  <!-- Top Header Bar -->
   <div class="topbar">
     <div class="logo">
       <div class="logo-mark"></div>
       <div class="logo-text">Bharat<span>Play</span></div>
     </div>
     <div class="tab-row">
-      <div class="tab" id="tab-following">Following</div>
-      <div class="tab active" id="tab-reels">Reels</div>
+      <div class="tab" id="tabFollowing">Following</div>
+      <div class="tab active" id="tabReels">Reels</div>
     </div>
   </div>
 
   <button class="mute-btn" id="muteBtn" aria-label="Mute toggle">
-    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+      <line x1="23" y1="9" x2="17" y2="15"></line>
+      <line x1="17" y1="9" x2="23" y2="15"></line>
+    </svg>
   </button>
 
-  <!-- 1. Home / Reels View -->
-  <div class="page-view active" id="view-home">
-    <div class="feed" id="feed"></div>
-  </div>
+  <div class="feed" id="feed"></div>
 
-  <!-- 2. Search View -->
-  <div class="page-view" id="view-search">
-    <div class="page-header">
-      <input type="text" class="search-input" placeholder="Search creators, videos, tags...">
-    </div>
-    <div class="grid-container">
-      <div class="grid-item"><span>#Trending</span></div>
-      <div class="grid-item"><span>#Dance</span></div>
-      <div class="grid-item"><span>#Comedy</span></div>
-      <div class="grid-item"><span>#Travel</span></div>
-      <div class="grid-item"><span>#Food</span></div>
-      <div class="grid-item"><span>#Music</span></div>
-    </div>
-  </div>
-
-  <!-- 3. Create / Banao View -->
-  <div class="page-view" id="view-create">
-    <div class="camera-screen">
-      <div class="cam-preview">
-        <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.5"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
-        <p>Camera Option Active</p>
-      </div>
-      <div class="cam-controls">
-        <label class="upload-btn">
-          📁 Video Upload
-          <input type="file" accept="video/*" id="video-upload" style="display:none;">
-        </label>
-        <div class="record-ring"><div class="record-btn"></div></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 4. Pasand / Likes View -->
-  <div class="page-view" id="view-likes">
-    <div class="page-title">Aapki Pasandita Videos</div>
-    <div class="empty-state">
-      <p>Aapne jo videos like ki hain woh yahan dikhengi! ❤️</p>
-    </div>
-  </div>
-
-  <!-- 5. Profile View -->
-  <div class="page-view" id="view-profile">
-    <div class="profile-container">
-      <div class="profile-header">
-        <img src="https://i.pravatar.cc/100?img=33" class="profile-avatar" alt="Profile">
-        <h3>@mera_username</h3>
-        <p class="profile-bio">Bharat Play Creator 🇮🇳 | Content Creator</p>
-      </div>
-      <div class="profile-stats">
-        <div class="stat"><strong>12</strong><span>Videos</span></div>
-        <div class="stat"><strong>1.4K</strong><span>Followers</span></div>
-        <div class="stat"><strong>15.2K</strong><span>Likes</span></div>
-      </div>
-      <button class="edit-profile-btn">Edit Profile</button>
-    </div>
-  </div>
-
-  <!-- BOTTOM SHEET: Comments -->
-  <div class="sheet-overlay" id="comment-overlay">
-    <div class="sheet">
-      <div class="sheet-header">
-        <span>Comments</span>
-        <button class="close-sheet" id="close-comments">✕</button>
-      </div>
-      <div class="comments-list" id="comments-list">
-        <div class="comment-item"><strong>@rahul_99</strong>: Kya mast video hai! 🔥</div>
-        <div class="comment-item"><strong>@priya_v</strong>: Bahut hi badhiya 👏</div>
-      </div>
-      <div class="comment-input-wrap">
-        <input type="text" id="comment-input" placeholder="Comment karein...">
-        <button id="send-comment-btn">Post</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- BOTTOM SHEET: Share -->
-  <div class="sheet-overlay" id="share-overlay">
-    <div class="sheet">
-      <div class="sheet-header">
-        <span>Share Video</span>
-        <button class="close-sheet" id="close-share">✕</button>
-      </div>
-      <div class="share-grid">
-        <button class="share-opt" onclick="alert('Link Copied!')">🔗 Copy Link</button>
-        <button class="share-opt" onclick="alert('WhatsApp par share karein')">💬 WhatsApp</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Bottom Navigation -->
   <div class="bottomnav">
-    <div class="nav-item active" id="nav-home">
+    <div class="nav-item active" id="navHome">
       <svg viewBox="0 0 24 24" fill="white"><path d="M12 3l9 8h-3v9h-5v-6H11v6H6v-9H3z"/></svg>
       <span>Home</span>
     </div>
-    <div class="nav-item" id="nav-search">
+    <div class="nav-item" id="navSearch">
       <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       <span>Search</span>
     </div>
-    <div class="nav-item" id="nav-create">
+    <div class="nav-item" id="navCreate">
       <div class="nav-create">
         <svg viewBox="0 0 24 24" fill="none" stroke="#000" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
       </div>
-      <span>Banao</span>
+      <span>Create</span>
     </div>
-    <div class="nav-item" id="nav-likes">
+    <div class="nav-item" id="navLikes">
       <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>
-      <span>Pasand</span>
+      <span>Liked</span>
     </div>
-    <div class="nav-item" id="nav-profile">
+    <div class="nav-item" id="navProfile">
       <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg>
       <span>Profile</span>
     </div>
   </div>
-
 </div>
 
-<script src="script.js"></script>
+<!-- Bottom sheet used for comments / share / more / placeholders -->
+<div class="sheet-overlay" id="sheetOverlay">
+  <div class="sheet" id="sheet">
+    <div class="sheet-handle"></div>
+    <div class="sheet-content" id="sheetContent"></div>
+  </div>
+</div>
+
+<!-- Simple full screen placeholders for nav tabs -->
+<div class="screen-overlay" id="screenOverlay">
+  <div class="screen-header">
+    <button class="screen-back" id="screenBack">
+      <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+    </button>
+    <div class="screen-title" id="screenTitle">Title</div>
+  </div>
+  <div class="screen-body" id="screenBody"></div>
+</div>
+
+<!-- Firebase SDK (compat build, works directly with <script> tags, no npm needed) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+
+<script>
+const firebaseConfig = {
+  apiKey: "AIzaSyAl-LuxyjTr-veAiftzJxyZA7lK4y9UA6s",
+  authDomain: "pioneering-flag-453005-g5.firebaseapp.com",
+  projectId: "pioneering-flag-453005-g5",
+  storageBucket: "pioneering-flag-453005-g5.firebasestorage.app",
+  messagingSenderId: "1009940089106",
+  appId: "1:1009940089106:web:ff4cd307470aad29854bcb",
+  measurementId: "G-DSCH8MPTGY"
+};
+firebase.initializeApp(firebaseConfig);
+const fbAuth = firebase.auth();
+</script>
+
+<script>
+/* ---------- Auth (real Firebase Phone OTP login) ---------- */
+function getAccount(){
+  try {
+    const raw = localStorage.getItem('bp_account');
+    return raw ? JSON.parse(raw) : null;
+  } catch(e){ return null; }
+}
+
+const authOverlay = document.getElementById('authOverlay');
+const appEl = document.getElementById('app');
+const stepPhone = document.getElementById('authStepPhone');
+const stepOtp = document.getElementById('authStepOtp');
+const phoneInput = document.getElementById('phoneInput');
+const phoneError = document.getElementById('phoneError');
+const otpInput = document.getElementById('otpInput');
+const otpError = document.getElementById('otpError');
+const otpLabel = document.getElementById('otpLabel');
+const sendOtpBtn = document.getElementById('sendOtpBtn');
+const verifyOtpBtn = document.getElementById('verifyOtpBtn');
+const authDemoNote = document.getElementById('authDemoNote');
+
+authDemoNote.textContent = "We'll text you a verification code. Standard message rates may apply.";
+
+function showApp(){
+  authOverlay.style.display = 'none';
+  appEl.classList.add('ready');
+}
+
+let confirmationResult = null;
+
+const existingAccount = getAccount();
+if (existingAccount){
+  showApp();
+} else {
+  // Invisible reCAPTCHA — Firebase needs this to confirm a real browser
+  // is requesting the SMS, so it can't be abused to spam numbers.
+  window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+    size: 'invisible'
+  });
+
+  sendOtpBtn.addEventListener('click', () => {
+    const val = phoneInput.value.trim();
+    if (!/^[6-9]\d{9}$/.test(val)){
+      phoneError.style.display = 'block';
+      return;
+    }
+    phoneError.style.display = 'none';
+    sendOtpBtn.disabled = true;
+    sendOtpBtn.textContent = 'Sending OTP...';
+
+    const fullNumber = '+91' + val;
+    firebase.auth().signInWithPhoneNumber(fullNumber, window.recaptchaVerifier)
+      .then((result) => {
+        confirmationResult = result;
+        otpLabel.textContent = `Enter the OTP sent to +91 ${val}`;
+        stepPhone.style.display = 'none';
+        stepOtp.style.display = 'block';
+        otpInput.focus();
+      })
+      .catch((error) => {
+        console.error(error);
+        phoneError.textContent = 'Could not send OTP. Please check the number and try again.';
+        phoneError.style.display = 'block';
+      })
+      .finally(() => {
+        sendOtpBtn.disabled = false;
+        sendOtpBtn.textContent = 'Send OTP';
+      });
+  });
+
+  document.getElementById('changeNumberBtn').addEventListener('click', () => {
+    stepOtp.style.display = 'none';
+    stepPhone.style.display = 'block';
+    otpInput.value = '';
+    otpError.style.display = 'none';
+  });
+
+  verifyOtpBtn.addEventListener('click', () => {
+    const otp = otpInput.value.trim();
+    if (otp.length !== 6 || !confirmationResult){
+      otpError.textContent = 'Enter the 6-digit OTP';
+      otpError.style.display = 'block';
+      return;
+    }
+    verifyOtpBtn.disabled = true;
+    verifyOtpBtn.textContent = 'Verifying...';
+
+    confirmationResult.confirm(otp)
+      .then((result) => {
+        const account = {
+          phone: phoneInput.value.trim(),
+          uid: result.user.uid,
+          createdAt: Date.now()
+        };
+        localStorage.setItem('bp_account', JSON.stringify(account));
+        showApp();
+      })
+      .catch((error) => {
+        console.error(error);
+        otpError.textContent = 'Wrong OTP, please try again.';
+        otpError.style.display = 'block';
+      })
+      .finally(() => {
+        verifyOtpBtn.disabled = false;
+        verifyOtpBtn.textContent = 'Verify & Continue';
+      });
+  });
+}
+</script>
+<script>
+const REELS = [
+  {
+    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
+    user: "nitinsharma", tag: "Founder", verified: true,
+    caption: "Welcome to Bharat Play 🇮🇳 Made this app from scratch — hope you enjoy scrolling as much as I enjoyed building it! #bharatplay #founder",
+    sound: "Nitin Sharma - Original audio",
+    avatar: "https://i.pravatar.cc/100?img=68",
+    likes: "540K", comments: "12.3K", shares: "8.9K"
+  },
+  {
+    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+    user: "riya.dance", tag: "Trending",
+    caption: "Sunday morning vibes 🌻 tried this new choreography, let me know what you think! #dance #bharatplay",
+    sound: "Riya - Original audio",
+    avatar: "https://i.pravatar.cc/100?img=47",
+    likes: "128K", comments: "842", shares: "310"
+  },
+  {
+    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+    user: "foodie_raj", tag: "Food",
+    caption: "Homemade street-style pani puri 😋 drop a comment if you want the recipe! #food #streetfood",
+    sound: "Original audio - foodie_raj",
+    avatar: "https://i.pravatar.cc/100?img=12",
+    likes: "64.2K", comments: "1.2K", shares: "980"
+  },
+  {
+    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
+    user: "traveltak.india", tag: "Travel",
+    caption: "Sunrise in Ladakh ❄️ this view never gets old. Where should I go next? #india #travel",
+    sound: "Mountain beats - remix",
+    avatar: "https://i.pravatar.cc/100?img=33",
+    likes: "302K", comments: "5.4K", shares: "2.1K"
+  },
+  {
+    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4",
+    user: "studio.beats.official", tag: "Music",
+    caption: "First look at the new album 🎶 full song link in bio. #newmusic #bharatplay",
+    sound: "Studio Beats - Teaser",
+    avatar: "https://i.pravatar.cc/100?img=60",
+    likes: "210K", comments: "7.8K", shares: "4.4K"
+  }
+];
+
+const feed = document.getElementById('feed');
+let muted = true;
+
+function heartIcon(filled){
+  return `<svg viewBox="0 0 24 24" ${filled? 'fill="var(--heart)" stroke="var(--heart)"':'fill="none" stroke="white"'} stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>`;
+}
+const commentIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>`;
+const shareIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>`;
+const moreIcon = `<svg viewBox="0 0 24 24" fill="white"><circle cx="12" cy="5" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="12" cy="19" r="1.8"/></svg>`;
+const noteIcon = `<svg viewBox="0 0 24 24" fill="white"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3" fill="none" stroke="white" stroke-width="2"/><circle cx="18" cy="16" r="3" fill="none" stroke="white" stroke-width="2"/></svg>`;
+const verifiedBadge = `<svg viewBox="0 0 24 24" width="15" height="15" style="flex-shrink:0;"><path fill="#3897F0" d="M12 2 14.5 4.2 17.8 3.6 18.8 6.8 21.8 8.4 20.6 11.6 21.8 14.8 18.8 16.4 17.8 19.6 14.5 19 12 21.2 9.5 19 6.2 19.6 5.2 16.4 2.2 14.8 3.4 11.6 2.2 8.4 5.2 6.8 6.2 3.6 9.5 4.2z"/><path fill="white" d="M10.6 14.9 8.4 12.7l1.1-1.1 1.1 1.1 3.1-3.1 1.1 1.1z"/></svg>`;
+
+REELS.forEach((r, i) => {
+  const el = document.createElement('div');
+  el.className = 'reel';
+  el.innerHTML = `
+    <video src="${r.src}" loop playsinline muted preload="metadata"></video>
+    <div class="reel-shade"></div>
+    <div class="rail">
+      <div class="rail-item">
+        <div class="rail-avatar"><img src="${r.avatar}" alt=""></div>
+      </div>
+      <div class="rail-item like-item">
+        <div class="rail-btn">${heartIcon(false)}</div>
+        <div class="rail-count">${r.likes}</div>
+      </div>
+      <div class="rail-item comment-item">
+        <div class="rail-btn">${commentIcon}</div>
+        <div class="rail-count">${r.comments}</div>
+      </div>
+      <div class="rail-item share-item">
+        <div class="rail-btn">${shareIcon}</div>
+        <div class="rail-count">${r.shares}</div>
+      </div>
+      <div class="rail-item more-item">
+        <div class="rail-btn">${moreIcon}</div>
+      </div>
+    </div>
+    <div class="info">
+      <div class="username">
+        <span>@${r.user}</span>
+        ${r.verified ? verifiedBadge : ''}
+        <span class="tag">${r.tag}</span>
+        <span class="follow-btn">Follow</span>
+      </div>
+      <div class="caption">${r.caption}</div>
+      <div class="sound">
+        <div class="sound-icon">${noteIcon}</div>
+        <div class="marquee-wrap"><div class="marquee">${r.sound} &nbsp;&nbsp;•&nbsp;&nbsp; ${r.sound} &nbsp;&nbsp;•&nbsp;&nbsp;</div></div>
+      </div>
+    </div>
+  `;
+  feed.appendChild(el);
+
+  const video = el.querySelector('video');
+  const likeItem = el.querySelector('.like-item');
+  const commentItem = el.querySelector('.comment-item');
+  const shareItem = el.querySelector('.share-item');
+  const moreItem = el.querySelector('.more-item');
+  const followBtn = el.querySelector('.follow-btn');
+  let liked = false;
+  let following = false;
+
+  el.addEventListener('click', (e) => {
+    if (e.target.closest('.rail-item') || e.target.closest('.info')) return;
+    if (video.paused) video.play(); else video.pause();
+  });
+
+  likeItem.addEventListener('click', () => {
+    liked = !liked;
+    likeItem.classList.toggle('liked', liked);
+    likeItem.querySelector('.rail-btn').innerHTML = heartIcon(liked);
+  });
+
+  followBtn.addEventListener('click', () => {
+    following = !following;
+    followBtn.textContent = following ? 'Following' : 'Follow';
+    followBtn.style.background = following ? 'rgba(255,255,255,0.2)' : 'transparent';
+    showToast(following ? `You are now following @${r.user}` : `Unfollowed @${r.user}`);
+  });
+
+  commentItem.addEventListener('click', () => openComments(r));
+  shareItem.addEventListener('click', () => openShare(r));
+  moreItem.addEventListener('click', () => openMore(r));
+
+  el._video = video;
+});
+
+// Autoplay only the visible reel
+const videos = [...document.querySelectorAll('.reel video')];
+const observer = new IntersectionObserver((entries) => {
+  entries.forEach(entry => {
+    const v = entry.target;
+    if (entry.isIntersecting && entry.intersectionRatio > 0.6){
+      v.muted = muted;
+      v.play().catch(()=>{});
+    } else {
+      v.pause();
+    }
+  });
+}, { threshold: [0.6] });
+videos.forEach(v => observer.observe(v));
+
+// start first video on load (needs a user gesture on some browsers, so also bind to first click)
+window.addEventListener('load', () => {
+  videos[0].muted = muted;
+  videos[0].play().catch(()=>{});
+});
+
+const muteBtn = document.getElementById('muteBtn');
+muteBtn.addEventListener('click', () => {
+  muted = !muted;
+  videos.forEach(v => v.muted = muted);
+  muteBtn.innerHTML = muted
+    ? `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`
+    : `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18 6a9 9 0 0 1 0 12"/></svg>`;
+});
+
+/* ---------- Toast ---------- */
+let toastTimer;
+function showToast(msg){
+  let toast = document.getElementById('toastBox');
+  if(!toast){
+    toast = document.createElement('div');
+    toast.id = 'toastBox';
+    toast.className = 'toast';
+    document.getElementById('app').appendChild(toast);
+  }
+  toast.textContent = msg;
+  toast.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+}
+
+/* ---------- Bottom sheet ---------- */
+const sheetOverlay = document.getElementById('sheetOverlay');
+const sheetContent = document.getElementById('sheetContent');
+function openSheet(html){
+  sheetContent.innerHTML = html;
+  sheetOverlay.classList.add('open');
+}
+function closeSheet(){ sheetOverlay.classList.remove('open'); }
+sheetOverlay.addEventListener('click', (e) => { if(e.target === sheetOverlay) closeSheet(); });
+
+const SAMPLE_COMMENTS = [
+  { user: "aisha.k", text: "This is amazing! 🔥", avatar: "https://i.pravatar.cc/60?img=5" },
+  { user: "rohit_singh", text: "How did you do this, so good 😍", avatar: "https://i.pravatar.cc/60?img=8" },
+  { user: "priya.here", text: "When is the next part coming?", avatar: "https://i.pravatar.cc/60?img=9" },
+  { user: "dev.codes", text: "Bharat Play is the best app 🇮🇳", avatar: "https://i.pravatar.cc/60?img=14" },
+];
+function openComments(r){
+  const rows = SAMPLE_COMMENTS.map(c => `
+    <div class="comment-row">
+      <img src="${c.avatar}" alt="">
+      <div>
+        <div class="comment-user">@${c.user}</div>
+        <div class="comment-text">${c.text}</div>
+      </div>
+    </div>
+  `).join('');
+  openSheet(`<div class="sheet-title">${r.comments} Comments</div>${rows}
+    <div style="font-size:12px;color:var(--text-faint);text-align:center;margin-top:10px;">
+      Posting comments will work once a backend is connected
+    </div>`);
+}
+function openShare(r){
+  const opts = [
+    ["💬","WhatsApp"], ["📋","Copy link"], ["📩","Message"], ["📸","Instagram"], ["👥","Friends"], ["⋯","More"]
+  ];
+  const grid = opts.map(([icon,label]) => `
+    <div class="share-opt" data-label="${label}">
+      <div class="share-circle">${icon}</div>
+      <span>${label}</span>
+    </div>
+  `).join('');
+  openSheet(`<div class="sheet-title">Share @${r.user}'s reel</div><div class="share-grid">${grid}</div>`);
+  sheetContent.querySelectorAll('.share-opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+      closeSheet();
+      showToast(`Shared via ${opt.dataset.label} (demo)`);
+    });
+  });
+}
+function openMore(r){
+  openSheet(`
+    <div class="sheet-title">Options</div>
+    <div class="more-opt">🔖 Save</div>
+    <div class="more-opt">🔇 Mute @${r.user}</div>
+    <div class="more-opt">🚫 Not interested</div>
+    <div class="more-opt" style="color:#ff5c5c;">⚠️ Report</div>
+  `);
+  sheetContent.querySelectorAll('.more-opt').forEach(opt => {
+    opt.addEventListener('click', () => { closeSheet(); showToast('Done ✓'); });
+  });
+}
+
+/* ---------- Full screen panels ---------- */
+const screenOverlay = document.getElementById('screenOverlay');
+const screenTitle = document.getElementById('screenTitle');
+const screenBody = document.getElementById('screenBody');
+document.getElementById('screenBack').addEventListener('click', () => {
+  screenOverlay.classList.remove('open');
+});
+
+function openScreen(title, html){
+  screenTitle.textContent = title;
+  screenBody.innerHTML = html;
+  screenOverlay.classList.add('open');
+}
+
+function emptyState(icon, title, sub){
+  return `<div class="empty-state"><div class="big">${icon}</div><div class="title">${title}</div><div class="sub">${sub}</div></div>`;
+}
+
+document.getElementById('navSearch').addEventListener('click', () => {
+  openScreen('Search', `
+    <input class="search-input" placeholder="Search reels, people, hashtags...">
+    ${emptyState('🔍','Search something','Type a name, hashtag, or sound to find reels')}
+  `);
+});
+
+document.getElementById('navCreate').addEventListener('click', () => {
+  openScreen('Create New Reel', `
+    <div class="create-opt"><div class="ic">🎥</div><div><b>Record</b><span>Shoot directly with your camera</span></div></div>
+    <div class="create-opt"><div class="ic">🖼️</div><div><b>Choose from gallery</b><span>Upload a video you already have</span></div></div>
+    <div class="create-opt"><div class="ic">🎵</div><div><b>Trending sounds</b><span>Browse popular music</span></div></div>
+    ${emptyState('🎬','Upload is a demo feature right now','Connecting a real backend (like Firebase Storage) will make this work')}
+  `);
+});
+
+document.getElementById('navLikes').addEventListener('click', () => {
+  openScreen('Liked Reels', emptyState('❤️','No liked reels yet','Reels you like will show up here'));
+});
+
+document.getElementById('navProfile').addEventListener('click', () => {
+  const acc = getAccount();
+  openScreen('Profile', `
+    <div class="profile-top">
+      <img src="https://i.pravatar.cc/150?img=47" alt="">
+      <div class="pname">${acc ? '+91 ' + acc.phone : '@your.account'}</div>
+      <div class="profile-stats">
+        <div><b>0</b><span>Reels</span></div>
+        <div><b>0</b><span>Followers</span></div>
+        <div><b>0</b><span>Following</span></div>
+      </div>
+    </div>
+    ${emptyState('🎞️','No reels posted yet','Post your first reel from the Create tab')}
+    <div style="text-align:center;margin-top:24px;">
+      <button id="logoutBtn" style="background:none;border:1px solid rgba(255,255,255,0.25);color:var(--white);padding:9px 20px;border-radius:8px;font-size:13px;font-weight:600;">Log out</button>
+    </div>
+    <div style="text-align:center;margin-top:26px;font-size:11px;color:var(--text-faint);line-height:1.6;">
+      Bharat Play<br>Founded &amp; owned by Nitin Sharma ✔
+    </div>
+  `);
+  document.getElementById('logoutBtn').addEventListener('click', () => {
+    localStorage.removeItem('bp_account');
+    location.reload();
+  });
+});
+
+document.getElementById('tabFollowing').addEventListener('click', () => {
+  document.getElementById('tabFollowing').classList.add('active');
+  document.getElementById('tabReels').classList.remove('active');
+  openScreen('Following', emptyState('👥','Not following anyone yet','Reels from people you follow will show up here'));
+  setTimeout(() => {
+    document.getElementById('tabFollowing').classList.remove('active');
+    document.getElementById('tabReels').classList.add('active');
+  }, 300);
+});
+
+
+// Remove any previously installed service worker so old cached
+// broken versions stop being served to returning visitors.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    regs.forEach((reg) => reg.unregister());
+  });
+}
+if (window.caches) {
+  caches.keys().then((names) => names.forEach((n) => caches.delete(n)));
+}
+</script>
 </body>
 </html>
