@@ -121,18 +121,20 @@ const moreIcon = `<svg viewBox="0 0 24 24" fill="white"><circle cx="12" cy="5" r
 const noteIcon = `<svg viewBox="0 0 24 24" fill="white"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3" fill="none" stroke="white" stroke-width="2"/><circle cx="18" cy="16" r="3" fill="none" stroke="white" stroke-width="2"/></svg>`;
 const verifiedBadge = `<svg viewBox="0 0 24 24" width="15" height="15" style="flex-shrink:0;"><path fill="#3897F0" d="M12 2 14.5 4.2 17.8 3.6 18.8 6.8 21.8 8.4 20.6 11.6 21.8 14.8 18.8 16.4 17.8 19.6 14.5 19 12 21.2 9.5 19 6.2 19.6 5.2 16.4 2.2 14.8 3.4 11.6 2.2 8.4 5.2 6.8 6.2 3.6 9.5 4.2z"/><path fill="white" d="M10.6 14.9 8.4 12.7l1.1-1.1 1.1 1.1 3.1-3.1 1.1 1.1z"/></svg>`;
 
-// Function to render a Reel Item
+// Function to render a Reel Element
 function createReelElement(r) {
   const el = document.createElement('div');
   el.className = 'reel';
-  
-  // FIX: Added autoplay=1 & mute=1 for YouTube embeds
-  const videoMedia = r.isYoutube 
-    ? `<iframe src="https://www.youtube.com/embed/${r.ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${r.ytId}&rel=0&enablejsapi=1&playsinline=1" style="width:100%;height:100%;border:none;" allow="autoplay; encrypted-media" allowfullscreen></iframe>`
+  el.dataset.isYt = r.isYoutube ? "true" : "false";
+  if(r.ytId) el.dataset.ytid = r.ytId;
+
+  // Render Thumbnail first for smooth scrolling (Lazy Load)
+  const initialMedia = r.isYoutube
+    ? `<div class="media-box"><img src="https://i.ytimg.com/vi/${r.ytId}/hqdefault.jpg" style="width:100%;height:100%;object-fit:cover;"></div>`
     : `<video src="${r.src}" loop playsinline muted preload="metadata"></video>`;
 
   el.innerHTML = `
-    ${videoMedia}
+    ${initialMedia}
     <div class="reel-shade"></div>
     <div class="rail">
       <div class="rail-item">
@@ -180,6 +182,14 @@ function createReelElement(r) {
 
   el.addEventListener('click', (e) => {
     if (e.target.closest('.rail-item') || e.target.closest('.info')) return;
+    
+    // Tap anywhere to Unmute
+    if(muted) {
+      muted = false;
+      updateMuteState();
+      showToast('🔊 Sound Turned ON');
+    }
+
     if (video) {
       if (video.paused) video.play(); else video.pause();
     }
@@ -202,23 +212,19 @@ function createReelElement(r) {
   shareItem.addEventListener('click', () => openShare(r));
   moreItem.addEventListener('click', () => openMore(r));
 
-  if(video) el._video = video;
   return el;
 }
 
-// Render Initial Local Reels
+// Render Local Reels
 REELS.forEach(r => {
-  const reelEl = createReelElement(r);
-  feed.appendChild(reelEl);
+  feed.appendChild(createReelElement(r));
 });
 
-// Fetch Live Trending Videos from YouTube
+// Fetch Live YouTube Trending
 async function loadYouTubeTrending() {
   try {
     const res = await fetch('https://pipedapi.kavin.rocks/trending?region=IN');
     const data = await res.json();
-    
-    // Pick Top 8 Trending Items
     const trending = data.slice(0, 8);
 
     trending.forEach((v, index) => {
@@ -239,59 +245,91 @@ async function loadYouTubeTrending() {
         shares: `${(Math.floor(Math.random() * 3) + 1)}K`
       };
 
-      const reelEl = createReelElement(ytReel);
-      feed.appendChild(reelEl);
+      feed.appendChild(createReelElement(ytReel));
     });
 
     observeVideos();
 
   } catch(e) {
-    console.log("YouTube Trending auto-fetch fallback:", e);
+    console.log("YouTube Trending fetch fallback:", e);
   }
 }
 
-// Observe and Autoplay Videos
+// Smart Lazy-Loading Intersection Observer (Zero-Lag Memory Manager)
 let observer;
 function observeVideos() {
-  const videos = [...document.querySelectorAll('.reel video')];
+  const reelEls = [...document.querySelectorAll('.reel')];
   if(observer) observer.disconnect();
 
   observer = new IntersectionObserver((entries) => {
     entries.forEach(entry => {
-      const v = entry.target;
-      if (entry.isIntersecting && entry.intersectionRatio > 0.6){
-        v.muted = muted;
-        v.play().catch(()=>{});
+      const el = entry.target;
+      const isYt = el.dataset.isYt === "true";
+      const ytId = el.dataset.ytid;
+      const video = el.querySelector('video');
+
+      if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+        if(isYt && ytId) {
+          // Mount YouTube Iframe ONLY when in view
+          const mediaBox = el.querySelector('.media-box');
+          if(mediaBox && !mediaBox.querySelector('iframe')) {
+            const muteParam = muted ? 1 : 0;
+            mediaBox.innerHTML = `<iframe src="https://www.youtube.com/embed/${ytId}?autoplay=1&mute=${muteParam}&controls=0&loop=1&playlist=${ytId}&rel=0&enablejsapi=1&playsinline=1" style="width:100%;height:100%;border:none;" allow="autoplay; encrypted-media"></iframe>`;
+          }
+        } else if(video) {
+          video.muted = muted;
+          video.play().catch(()=>{});
+        }
       } else {
-        v.pause();
+        // Destroy Iframe when scrolled away to FREE UP RAM and prevent LAG!
+        if(isYt && ytId) {
+          const mediaBox = el.querySelector('.media-box');
+          if(mediaBox && mediaBox.querySelector('iframe')) {
+            mediaBox.innerHTML = `<img src="https://i.ytimg.com/vi/${ytId}/hqdefault.jpg" style="width:100%;height:100%;object-fit:cover;">`;
+          }
+        } else if(video) {
+          video.pause();
+        }
       }
     });
   }, { threshold: [0.6] });
 
-  videos.forEach(v => observer.observe(v));
+  reelEls.forEach(el => observer.observe(el));
 }
 
-// Start Video Observation & Load Live YouTube Videos
-observeVideos();
-loadYouTubeTrending();
+// Toggle Sound State Global Function
+function updateMuteState() {
+  const videos = [...document.querySelectorAll('video')];
+  videos.forEach(v => v.muted = muted);
 
-window.addEventListener('load', () => {
-  const firstVid = document.querySelector('.reel video');
-  if(firstVid) {
-    firstVid.muted = muted;
-    firstVid.play().catch(()=>{});
+  // Reload current visible active YouTube iframe with new sound setting
+  const activeYtBox = document.querySelector('.reel .media-box iframe');
+  if(activeYtBox) {
+    let src = activeYtBox.src;
+    src = muted ? src.replace('mute=0', 'mute=1') : src.replace('mute=1', 'mute=0');
+    activeYtBox.src = src;
   }
-});
+
+  const muteBtn = document.getElementById('muteBtn');
+  if(muteBtn) {
+    muteBtn.innerHTML = muted
+      ? `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`
+      : `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18 6a9 9 0 0 1 0 12"/></svg>`;
+  }
+}
 
 const muteBtn = document.getElementById('muteBtn');
-muteBtn.addEventListener('click', () => {
-  muted = !muted;
-  const videos = [...document.querySelectorAll('.reel video')];
-  videos.forEach(v => v.muted = muted);
-  muteBtn.innerHTML = muted
-    ? `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`
-    : `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18 6a9 9 0 0 1 0 12"/></svg>`;
-});
+if(muteBtn) {
+  muteBtn.addEventListener('click', () => {
+    muted = !muted;
+    updateMuteState();
+    showToast(muted ? "🔇 Muted" : "🔊 Sound ON");
+  });
+}
+
+// Start
+observeVideos();
+loadYouTubeTrending();
 
 /* ---------- Toast ---------- */
 let toastTimer;
