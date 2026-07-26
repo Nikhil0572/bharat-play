@@ -1,5 +1,4 @@
 /* ---------------------------------- */
-
 /* ---------- Auth (email + password via Firebase) ---------- */
 const firebaseConfig = {
   apiKey: "AIzaSyAl-LuxyjTr-veAiftzJxyZA7lK4y9UA6s",
@@ -44,7 +43,7 @@ function saveAccountAndEnter(user){
 const existingAccount = getAccount();
 if (existingAccount){
   showApp();
-} else {
+} else if (loginBtn) {
   loginBtn.addEventListener('click', () => {
     const email = emailInput.value.trim();
     const password = passwordInput.value;
@@ -70,11 +69,6 @@ if (existingAccount){
       loginBtn.textContent = 'Log In / Sign Up';
     }
 
-    // Try logging in first. If the account doesn't exist yet (Firebase may
-    // report this as 'auth/user-not-found' or, on newer SDK versions,
-    // the more generic 'auth/invalid-credential'), fall back to creating
-    // a new account automatically — this gives a single-step login-or-signup
-    // experience without us needing to know in advance which case it is.
     firebase.auth().signInWithEmailAndPassword(email, password)
       .then((result) => saveAccountAndEnter(result.user))
       .catch((error) => {
@@ -82,8 +76,6 @@ if (existingAccount){
           .then((result) => saveAccountAndEnter(result.user))
           .catch((err) => {
             if (err.code === 'auth/email-already-in-use'){
-              // Account exists after all — the original sign-in failure
-              // really was a wrong password.
               authError.textContent = 'Incorrect password. Please try again.';
             } else {
               authError.textContent = err.message.replace('Firebase: ', '');
@@ -97,6 +89,7 @@ if (existingAccount){
 
 /* ---------------------------------- */
 
+// Default Featured Reels
 const REELS = [
   {
     src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
@@ -121,22 +114,6 @@ const REELS = [
     sound: "Original audio - foodie_raj",
     avatar: "https://i.pravatar.cc/100?img=12",
     likes: "64.2K", comments: "1.2K", shares: "980"
-  },
-  {
-    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4",
-    user: "traveltak.india", tag: "Travel",
-    caption: "Sunrise in Ladakh ❄️ this view never gets old. Where should I go next? #india #travel",
-    sound: "Mountain beats - remix",
-    avatar: "https://i.pravatar.cc/100?img=33",
-    likes: "302K", comments: "5.4K", shares: "2.1K"
-  },
-  {
-    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4",
-    user: "studio.beats.official", tag: "Music",
-    caption: "First look at the new album 🎶 full song link in bio. #newmusic #bharatplay",
-    sound: "Studio Beats - Teaser",
-    avatar: "https://i.pravatar.cc/100?img=60",
-    likes: "210K", comments: "7.8K", shares: "4.4K"
   }
 ];
 
@@ -152,11 +129,18 @@ const moreIcon = `<svg viewBox="0 0 24 24" fill="white"><circle cx="12" cy="5" r
 const noteIcon = `<svg viewBox="0 0 24 24" fill="white"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3" fill="none" stroke="white" stroke-width="2"/><circle cx="18" cy="16" r="3" fill="none" stroke="white" stroke-width="2"/></svg>`;
 const verifiedBadge = `<svg viewBox="0 0 24 24" width="15" height="15" style="flex-shrink:0;"><path fill="#3897F0" d="M12 2 14.5 4.2 17.8 3.6 18.8 6.8 21.8 8.4 20.6 11.6 21.8 14.8 18.8 16.4 17.8 19.6 14.5 19 12 21.2 9.5 19 6.2 19.6 5.2 16.4 2.2 14.8 3.4 11.6 2.2 8.4 5.2 6.8 6.2 3.6 9.5 4.2z"/><path fill="white" d="M10.6 14.9 8.4 12.7l1.1-1.1 1.1 1.1 3.1-3.1 1.1 1.1z"/></svg>`;
 
-REELS.forEach((r, i) => {
+// Function to render a Reel Item
+function createReelElement(r) {
   const el = document.createElement('div');
   el.className = 'reel';
+  
+  // Check if YouTube Embed or Normal MP4 Video
+  const videoMedia = r.isYoutube 
+    ? `<iframe src="https://www.youtube.com/embed/${r.ytId}?autoplay=0&controls=0&loop=1&playlist=${r.ytId}&rel=0&enablejsapi=1" style="width:100%;height:100%;border:none;pointer-events:none;" allow="autoplay; encrypted-media"></iframe>`
+    : `<video src="${r.src}" loop playsinline muted preload="metadata"></video>`;
+
   el.innerHTML = `
-    <video src="${r.src}" loop playsinline muted preload="metadata"></video>
+    ${videoMedia}
     <div class="reel-shade"></div>
     <div class="rail">
       <div class="rail-item">
@@ -192,7 +176,6 @@ REELS.forEach((r, i) => {
       </div>
     </div>
   `;
-  feed.appendChild(el);
 
   const video = el.querySelector('video');
   const likeItem = el.querySelector('.like-item');
@@ -205,7 +188,9 @@ REELS.forEach((r, i) => {
 
   el.addEventListener('click', (e) => {
     if (e.target.closest('.rail-item') || e.target.closest('.info')) return;
-    if (video.paused) video.play(); else video.pause();
+    if (video) {
+      if (video.paused) video.play(); else video.pause();
+    }
   });
 
   likeItem.addEventListener('click', () => {
@@ -225,33 +210,92 @@ REELS.forEach((r, i) => {
   shareItem.addEventListener('click', () => openShare(r));
   moreItem.addEventListener('click', () => openMore(r));
 
-  el._video = video;
+  if(video) el._video = video;
+  return el;
+}
+
+// Render Initial Local Reels
+REELS.forEach(r => {
+  const reelEl = createReelElement(r);
+  feed.appendChild(reelEl);
 });
 
-// Autoplay only the visible reel
-const videos = [...document.querySelectorAll('.reel video')];
-const observer = new IntersectionObserver((entries) => {
-  entries.forEach(entry => {
-    const v = entry.target;
-    if (entry.isIntersecting && entry.intersectionRatio > 0.6){
-      v.muted = muted;
-      v.play().catch(()=>{});
-    } else {
-      v.pause();
-    }
-  });
-}, { threshold: [0.6] });
-videos.forEach(v => observer.observe(v));
+// Fetch Live Trending Videos from YouTube
+async function loadYouTubeTrending() {
+  try {
+    const res = await fetch('https://pipedapi.kavin.rocks/trending?region=IN');
+    const data = await res.json();
+    
+    // Pick Top 8 Trending Items
+    const trending = data.slice(0, 8);
 
-// start first video on load (needs a user gesture on some browsers, so also bind to first click)
+    trending.forEach((v, index) => {
+      const ytId = v.url.split('=')[1];
+      if(!ytId) return;
+
+      const ytReel = {
+        isYoutube: true,
+        ytId: ytId,
+        user: (v.uploaderName || "trending_creator").toLowerCase().replace(/\s+/g, '_'),
+        tag: "YouTube Trending",
+        verified: v.uploaderVerified || false,
+        caption: v.title || "Trending Shorts on Bharat Play 🔥 #trending",
+        sound: `${v.uploaderName || "Trending"} - Original Sound`,
+        avatar: v.uploaderAvatar || `https://i.pravatar.cc/100?img=${(index % 50) + 1}`,
+        likes: `${(Math.floor(Math.random() * 80) + 20)}K`,
+        comments: `${(Math.floor(Math.random() * 5) + 1)}K`,
+        shares: `${(Math.floor(Math.random() * 3) + 1)}K`
+      };
+
+      const reelEl = createReelElement(ytReel);
+      feed.appendChild(reelEl);
+    });
+
+    // Re-observe newly added videos
+    observeVideos();
+
+  } catch(e) {
+    console.log("YouTube Trending auto-fetch fallback:", e);
+  }
+}
+
+// Observe and Autoplay Videos
+let observer;
+function observeVideos() {
+  const videos = [...document.querySelectorAll('.reel video')];
+  if(observer) observer.disconnect();
+
+  observer = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      const v = entry.target;
+      if (entry.isIntersecting && entry.intersectionRatio > 0.6){
+        v.muted = muted;
+        v.play().catch(()=>{});
+      } else {
+        v.pause();
+      }
+    });
+  }, { threshold: [0.6] });
+
+  videos.forEach(v => observer.observe(v));
+}
+
+// Start Video Observation & Load Live YouTube Videos
+observeVideos();
+loadYouTubeTrending();
+
 window.addEventListener('load', () => {
-  videos[0].muted = muted;
-  videos[0].play().catch(()=>{});
+  const firstVid = document.querySelector('.reel video');
+  if(firstVid) {
+    firstVid.muted = muted;
+    firstVid.play().catch(()=>{});
+  }
 });
 
 const muteBtn = document.getElementById('muteBtn');
 muteBtn.addEventListener('click', () => {
   muted = !muted;
+  const videos = [...document.querySelectorAll('.reel video')];
   videos.forEach(v => v.muted = muted);
   muteBtn.innerHTML = muted
     ? `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`
@@ -414,9 +458,7 @@ document.getElementById('tabFollowing').addEventListener('click', () => {
   }, 300);
 });
 
-
-// Remove any previously installed service worker so old cached
-// broken versions stop being served to returning visitors.
+// Remove any previously installed service worker
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.getRegistrations().then((regs) => {
     regs.forEach((reg) => reg.unregister());
