@@ -89,28 +89,29 @@ if (existingAccount){
 
 /* ---------------------------------- */
 
-// Default Featured Reels
+// Initial Mix Data (Instagram Style Reels + Featured)
 const REELS = [
   {
     src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
-    user: "nitinsharma", tag: "Founder", verified: true,
-    caption: "Welcome to Bharat Play 🇮🇳 Made this app from scratch — hope you enjoy scrolling as much as I enjoyed building it! #bharatplay #founder",
-    sound: "Nitin Sharma - Original audio",
+    user: "nitinsharma", tag: "Founder 🇮🇳", verified: true,
+    caption: "Welcome to Bharat Play! Ultimate place for Trending Shorts & Reels 🔥 #bharatplay",
+    sound: "Nitin Sharma - Original Sound",
     avatar: "https://i.pravatar.cc/100?img=68",
     likes: "540K", comments: "12.3K", shares: "8.9K"
   },
   {
     src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
-    user: "riya.dance", tag: "Trending",
-    caption: "Sunday morning vibes 🌻 tried this new choreography, let me know what you think! #dance #bharatplay",
-    sound: "Riya - Original audio",
+    user: "insta_reels_india", tag: "Instagram Reel", verified: true,
+    caption: "Trending Instagram Reel 🌸 #reels #trending",
+    sound: "Instagram Trending Audio",
     avatar: "https://i.pravatar.cc/100?img=47",
-    likes: "128K", comments: "842", shares: "310"
+    likes: "890K", comments: "4.5K", shares: "18K"
   }
 ];
 
 const feed = document.getElementById('feed');
 let muted = true;
+let isLoadingMore = false;
 
 function heartIcon(filled){
   return `<svg viewBox="0 0 24 24" ${filled? 'fill="var(--heart)" stroke="var(--heart)"':'fill="none" stroke="white"'} stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.6l-1-1a5.5 5.5 0 0 0-7.8 7.8l1 1L12 21l7.8-7.6 1-1a5.5 5.5 0 0 0 0-7.8z"/></svg>`;
@@ -121,17 +122,16 @@ const moreIcon = `<svg viewBox="0 0 24 24" fill="white"><circle cx="12" cy="5" r
 const noteIcon = `<svg viewBox="0 0 24 24" fill="white"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3" fill="none" stroke="white" stroke-width="2"/><circle cx="18" cy="16" r="3" fill="none" stroke="white" stroke-width="2"/></svg>`;
 const verifiedBadge = `<svg viewBox="0 0 24 24" width="15" height="15" style="flex-shrink:0;"><path fill="#3897F0" d="M12 2 14.5 4.2 17.8 3.6 18.8 6.8 21.8 8.4 20.6 11.6 21.8 14.8 18.8 16.4 17.8 19.6 14.5 19 12 21.2 9.5 19 6.2 19.6 5.2 16.4 2.2 14.8 3.4 11.6 2.2 8.4 5.2 6.8 6.2 3.6 9.5 4.2z"/><path fill="white" d="M10.6 14.9 8.4 12.7l1.1-1.1 1.1 1.1 3.1-3.1 1.1 1.1z"/></svg>`;
 
-// Function to render a Reel Element
+// Create Reel Element
 function createReelElement(r) {
   const el = document.createElement('div');
   el.className = 'reel';
   el.dataset.isYt = r.isYoutube ? "true" : "false";
   if(r.ytId) el.dataset.ytid = r.ytId;
 
-  // Render Thumbnail first for smooth scrolling (Lazy Load)
   const initialMedia = r.isYoutube
-    ? `<div class="media-box"><img src="https://i.ytimg.com/vi/${r.ytId}/hqdefault.jpg" style="width:100%;height:100%;object-fit:cover;"></div>`
-    : `<video src="${r.src}" loop playsinline muted preload="metadata"></video>`;
+    ? `<div class="media-box" style="width:100%;height:100%;overflow:hidden;position:relative;"><img src="https://i.ytimg.com/vi/${r.ytId}/hqdefault.jpg" style="width:100%;height:100%;object-fit:cover;"></div>`
+    : `<video src="${r.src}" loop playsinline muted preload="metadata" style="width:100%;height:100%;object-fit:cover;"></video>`;
 
   el.innerHTML = `
     ${initialMedia}
@@ -183,7 +183,6 @@ function createReelElement(r) {
   el.addEventListener('click', (e) => {
     if (e.target.closest('.rail-item') || e.target.closest('.info')) return;
     
-    // Tap anywhere to Unmute
     if(muted) {
       muted = false;
       updateMuteState();
@@ -215,34 +214,38 @@ function createReelElement(r) {
   return el;
 }
 
-// Render Local Reels
-REELS.forEach(r => {
-  feed.appendChild(createReelElement(r));
-});
+REELS.forEach(r => feed.appendChild(createReelElement(r)));
 
-// Fetch Live YouTube Trending
-async function loadYouTubeTrending() {
+// Fetch Live YouTube Trending Shorts
+async function loadYouTubeTrendingShorts() {
+  if (isLoadingMore) return;
+  isLoadingMore = true;
+
   try {
     const res = await fetch('https://pipedapi.kavin.rocks/trending?region=IN');
     const data = await res.json();
-    const trending = data.slice(0, 8);
+    
+    // Pick random trending shorts
+    const items = data.sort(() => 0.5 - Math.random()).slice(0, 10);
 
-    trending.forEach((v, index) => {
-      const ytId = v.url.split('=')[1];
+    items.forEach((v, index) => {
+      const ytId = v.url ? v.url.split('=')[1] : null;
       if(!ytId) return;
+
+      const isShorts = (v.duration && v.duration < 60) || Math.random() > 0.3;
 
       const ytReel = {
         isYoutube: true,
         ytId: ytId,
-        user: (v.uploaderName || "trending_creator").toLowerCase().replace(/\s+/g, '_'),
-        tag: "YouTube Trending",
+        user: (v.uploaderName || "shorts_creator").toLowerCase().replace(/\s+/g, '_'),
+        tag: isShorts ? "YouTube Shorts 🔥" : "Trending Reel",
         verified: v.uploaderVerified || false,
-        caption: v.title || "Trending Shorts on Bharat Play 🔥 #trending",
+        caption: v.title || "Trending Short Video #shorts #bharatplay",
         sound: `${v.uploaderName || "Trending"} - Original Sound`,
-        avatar: v.uploaderAvatar || `https://i.pravatar.cc/100?img=${(index % 50) + 1}`,
-        likes: `${(Math.floor(Math.random() * 80) + 20)}K`,
-        comments: `${(Math.floor(Math.random() * 5) + 1)}K`,
-        shares: `${(Math.floor(Math.random() * 3) + 1)}K`
+        avatar: v.uploaderAvatar || `https://i.pravatar.cc/100?img=${Math.floor(Math.random() * 50) + 1}`,
+        likes: `${(Math.floor(Math.random() * 90) + 10)}K`,
+        comments: `${(Math.floor(Math.random() * 8) + 1)}K`,
+        shares: `${(Math.floor(Math.random() * 5) + 1)}K`
       };
 
       feed.appendChild(createReelElement(ytReel));
@@ -251,11 +254,13 @@ async function loadYouTubeTrending() {
     observeVideos();
 
   } catch(e) {
-    console.log("YouTube Trending fetch fallback:", e);
+    console.log("Error loading trending:", e);
+  } finally {
+    isLoadingMore = false;
   }
 }
 
-// Smart Lazy-Loading Intersection Observer (Zero-Lag Memory Manager)
+// Lazy Load & Full Screen Zoom Observer
 let observer;
 function observeVideos() {
   const reelEls = [...document.querySelectorAll('.reel')];
@@ -268,20 +273,25 @@ function observeVideos() {
       const ytId = el.dataset.ytid;
       const video = el.querySelector('video');
 
-      if (entry.isIntersecting && entry.intersectionRatio > 0.6) {
+      if (entry.isIntersecting && entry.intersectionRatio > 0.5) {
         if(isYt && ytId) {
-          // Mount YouTube Iframe ONLY when in view
           const mediaBox = el.querySelector('.media-box');
           if(mediaBox && !mediaBox.querySelector('iframe')) {
             const muteParam = muted ? 1 : 0;
-            mediaBox.innerHTML = `<iframe src="https://www.youtube.com/embed/${ytId}?autoplay=1&mute=${muteParam}&controls=0&loop=1&playlist=${ytId}&rel=0&enablejsapi=1&playsinline=1" style="width:100%;height:100%;border:none;" allow="autoplay; encrypted-media"></iframe>`;
+            mediaBox.innerHTML = `<iframe src="https://www.youtube.com/embed/${ytId}?autoplay=1&mute=${muteParam}&controls=0&loop=1&playlist=${ytId}&rel=0&enablejsapi=1&playsinline=1" style="width:100%;height:100%;border:none;transform:scale(1.35);" allow="autoplay; encrypted-media"></iframe>`;
           }
         } else if(video) {
           video.muted = muted;
           video.play().catch(()=>{});
         }
+
+        // Auto load more when 3 reels remaining
+        const currentIndex = reelEls.indexOf(el);
+        if (currentIndex >= reelEls.length - 3) {
+          loadYouTubeTrendingShorts();
+        }
+
       } else {
-        // Destroy Iframe when scrolled away to FREE UP RAM and prevent LAG!
         if(isYt && ytId) {
           const mediaBox = el.querySelector('.media-box');
           if(mediaBox && mediaBox.querySelector('iframe')) {
@@ -292,17 +302,15 @@ function observeVideos() {
         }
       }
     });
-  }, { threshold: [0.6] });
+  }, { threshold: [0.5] });
 
   reelEls.forEach(el => observer.observe(el));
 }
 
-// Toggle Sound State Global Function
 function updateMuteState() {
   const videos = [...document.querySelectorAll('video')];
   videos.forEach(v => v.muted = muted);
 
-  // Reload current visible active YouTube iframe with new sound setting
   const activeYtBox = document.querySelector('.reel .media-box iframe');
   if(activeYtBox) {
     let src = activeYtBox.src;
@@ -327,9 +335,9 @@ if(muteBtn) {
   });
 }
 
-// Start
+// Init
 observeVideos();
-loadYouTubeTrending();
+loadYouTubeTrendingShorts();
 
 /* ---------- Toast ---------- */
 let toastTimer;
@@ -429,7 +437,7 @@ function emptyState(icon, title, sub){
 
 document.getElementById('navSearch').addEventListener('click', () => {
   openScreen('Search', `
-    <input class="search-input" placeholder="Search reels, people, hashtags...">
+    <input class="search-input" placeholder="Search reels, shorts, hashtags...">
     ${emptyState('🔍','Search something','Type a name, hashtag, or sound to find reels')}
   `);
 });
