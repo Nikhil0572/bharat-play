@@ -1,6 +1,17 @@
 /* ---------------------------------- */
 
-/* ---------- Auth (real OTP via Fast2SMS, through our own /api backend) ---------- */
+/* ---------- Auth (Google Sign-In via Firebase) ---------- */
+const firebaseConfig = {
+  apiKey: "AIzaSyAl-LuxyjTr-veAiftzJxyZA7lK4y9UA6s",
+  authDomain: "pioneering-flag-453005-g5.firebaseapp.com",
+  projectId: "pioneering-flag-453005-g5",
+  storageBucket: "pioneering-flag-453005-g5.firebasestorage.app",
+  messagingSenderId: "1009940089106",
+  appId: "1:1009940089106:web:ff4cd307470aad29854bcb",
+  measurementId: "G-DSCH8MPTGY"
+};
+firebase.initializeApp(firebaseConfig);
+
 function getAccount(){
   try {
     const raw = localStorage.getItem('bp_account');
@@ -10,104 +21,44 @@ function getAccount(){
 
 const authOverlay = document.getElementById('authOverlay');
 const appEl = document.getElementById('app');
-const stepPhone = document.getElementById('authStepPhone');
-const stepOtp = document.getElementById('authStepOtp');
-const phoneInput = document.getElementById('phoneInput');
-const phoneError = document.getElementById('phoneError');
-const otpInput = document.getElementById('otpInput');
-const otpError = document.getElementById('otpError');
-const otpLabel = document.getElementById('otpLabel');
-const sendOtpBtn = document.getElementById('sendOtpBtn');
-const verifyOtpBtn = document.getElementById('verifyOtpBtn');
-const authDemoNote = document.getElementById('authDemoNote');
-
-authDemoNote.textContent = "We'll text you a verification code. Standard message rates may apply.";
+const googleSignInBtn = document.getElementById('googleSignInBtn');
+const googleError = document.getElementById('googleError');
 
 function showApp(){
   authOverlay.style.display = 'none';
   appEl.classList.add('ready');
 }
 
-let otpToken = null; // signed token returned by /api/send-otp, needed to verify
-
 const existingAccount = getAccount();
 if (existingAccount){
   showApp();
 } else {
-  sendOtpBtn.addEventListener('click', () => {
-    const val = phoneInput.value.trim();
-    if (!/^[6-9]\d{9}$/.test(val)){
-      phoneError.style.display = 'block';
-      return;
-    }
-    phoneError.style.display = 'none';
-    sendOtpBtn.disabled = true;
-    sendOtpBtn.textContent = 'Sending OTP...';
+  googleSignInBtn.addEventListener('click', () => {
+    googleError.style.display = 'none';
+    googleSignInBtn.disabled = true;
+    googleSignInBtn.querySelector('span').textContent = 'Signing in...';
 
-    fetch('/api/send-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ phone: val })
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data.token) throw new Error(data.error || 'Failed to send OTP');
-        otpToken = data.token;
-        otpLabel.textContent = `Enter the OTP sent to +91 ${val}`;
-        stepPhone.style.display = 'none';
-        stepOtp.style.display = 'block';
-        otpInput.focus();
-      })
-      .catch((error) => {
-        console.error(error);
-        phoneError.textContent = 'Could not send OTP. Please check the number and try again.';
-        phoneError.style.display = 'block';
-      })
-      .finally(() => {
-        sendOtpBtn.disabled = false;
-        sendOtpBtn.textContent = 'Send OTP';
-      });
-  });
-
-  document.getElementById('changeNumberBtn').addEventListener('click', () => {
-    stepOtp.style.display = 'none';
-    stepPhone.style.display = 'block';
-    otpInput.value = '';
-    otpError.style.display = 'none';
-  });
-
-  verifyOtpBtn.addEventListener('click', () => {
-    const otp = otpInput.value.trim();
-    if (otp.length !== 6 || !otpToken){
-      otpError.textContent = 'Enter the 6-digit OTP';
-      otpError.style.display = 'block';
-      return;
-    }
-    verifyOtpBtn.disabled = true;
-    verifyOtpBtn.textContent = 'Verifying...';
-
-    fetch('/api/verify-otp', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token: otpToken, otp })
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (!data.success) throw new Error(data.error || 'Verification failed');
-        const account = { phone: data.phone, createdAt: Date.now() };
+    const provider = new firebase.auth.GoogleAuthProvider();
+    firebase.auth().signInWithPopup(provider)
+      .then((result) => {
+        const user = result.user;
+        const account = {
+          name: user.displayName,
+          email: user.email,
+          photo: user.photoURL,
+          uid: user.uid,
+          createdAt: Date.now()
+        };
         localStorage.setItem('bp_account', JSON.stringify(account));
         showApp();
       })
       .catch((error) => {
         console.error(error);
-        otpError.textContent = error.message === 'OTP expired, please request a new one'
-          ? error.message
-          : 'Wrong OTP, please try again.';
-        otpError.style.display = 'block';
+        googleError.style.display = 'block';
       })
       .finally(() => {
-        verifyOtpBtn.disabled = false;
-        verifyOtpBtn.textContent = 'Verify & Continue';
+        googleSignInBtn.disabled = false;
+        googleSignInBtn.querySelector('span').textContent = 'Continue with Google';
       });
   });
 }
@@ -393,10 +344,14 @@ document.getElementById('navLikes').addEventListener('click', () => {
 
 document.getElementById('navProfile').addEventListener('click', () => {
   const acc = getAccount();
+  const avatarUrl = (acc && acc.photo) ? acc.photo : 'https://i.pravatar.cc/150?img=47';
+  const displayName = (acc && acc.name) ? acc.name : '@your.account';
+  const email = (acc && acc.email) ? acc.email : '';
   openScreen('Profile', `
     <div class="profile-top">
-      <img src="https://i.pravatar.cc/150?img=47" alt="">
-      <div class="pname">${acc ? '+91 ' + acc.phone : '@your.account'}</div>
+      <img src="${avatarUrl}" alt="">
+      <div class="pname">${displayName}</div>
+      ${email ? `<div style="color:var(--text-faint);font-size:12px;margin-top:2px;">${email}</div>` : ''}
       <div class="profile-stats">
         <div><b>0</b><span>Reels</span></div>
         <div><b>0</b><span>Followers</span></div>
