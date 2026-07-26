@@ -1,6 +1,6 @@
 /* ---------------------------------- */
 
-/* ---------- Auth (Google Sign-In via Firebase) ---------- */
+/* ---------- Auth (email + password via Firebase) ---------- */
 const firebaseConfig = {
   apiKey: "AIzaSyAl-LuxyjTr-veAiftzJxyZA7lK4y9UA6s",
   authDomain: "pioneering-flag-453005-g5.firebaseapp.com",
@@ -21,45 +21,74 @@ function getAccount(){
 
 const authOverlay = document.getElementById('authOverlay');
 const appEl = document.getElementById('app');
-const googleSignInBtn = document.getElementById('googleSignInBtn');
-const googleError = document.getElementById('googleError');
+const emailInput = document.getElementById('emailInput');
+const passwordInput = document.getElementById('passwordInput');
+const authError = document.getElementById('authError');
+const loginBtn = document.getElementById('loginBtn');
 
 function showApp(){
   authOverlay.style.display = 'none';
   appEl.classList.add('ready');
 }
 
+function saveAccountAndEnter(user){
+  const account = {
+    email: user.email,
+    uid: user.uid,
+    createdAt: Date.now()
+  };
+  localStorage.setItem('bp_account', JSON.stringify(account));
+  showApp();
+}
+
 const existingAccount = getAccount();
 if (existingAccount){
   showApp();
 } else {
-  googleSignInBtn.addEventListener('click', () => {
-    googleError.style.display = 'none';
-    googleSignInBtn.disabled = true;
-    googleSignInBtn.querySelector('span').textContent = 'Signing in...';
+  loginBtn.addEventListener('click', () => {
+    const email = emailInput.value.trim();
+    const password = passwordInput.value;
 
-    const provider = new firebase.auth.GoogleAuthProvider();
-    firebase.auth().signInWithPopup(provider)
-      .then((result) => {
-        const user = result.user;
-        const account = {
-          name: user.displayName,
-          email: user.email,
-          photo: user.photoURL,
-          uid: user.uid,
-          createdAt: Date.now()
-        };
-        localStorage.setItem('bp_account', JSON.stringify(account));
-        showApp();
-      })
+    authError.style.display = 'none';
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){
+      authError.textContent = 'Please enter a valid email address.';
+      authError.style.display = 'block';
+      return;
+    }
+    if (password.length < 6){
+      authError.textContent = 'Password must be at least 6 characters.';
+      authError.style.display = 'block';
+      return;
+    }
+
+    loginBtn.disabled = true;
+    loginBtn.textContent = 'Please wait...';
+
+    function resetButton(){
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Log In / Sign Up';
+    }
+
+    // Try logging in first. If the account doesn't exist yet, create it
+    // automatically — this gives a single-step login-or-signup experience.
+    firebase.auth().signInWithEmailAndPassword(email, password)
+      .then((result) => saveAccountAndEnter(result.user))
       .catch((error) => {
-        console.error(error);
-        googleError.style.display = 'block';
+        if (error.code === 'auth/user-not-found'){
+          return firebase.auth().createUserWithEmailAndPassword(email, password)
+            .then((result) => saveAccountAndEnter(result.user))
+            .catch((err) => {
+              authError.textContent = err.message.replace('Firebase: ', '');
+              authError.style.display = 'block';
+            });
+        }
+        authError.textContent = error.code === 'auth/wrong-password'
+          ? 'Incorrect password. Please try again.'
+          : error.message.replace('Firebase: ', '');
+        authError.style.display = 'block';
       })
-      .finally(() => {
-        googleSignInBtn.disabled = false;
-        googleSignInBtn.querySelector('span').textContent = 'Continue with Google';
-      });
+      .finally(resetButton);
   });
 }
 
@@ -344,8 +373,8 @@ document.getElementById('navLikes').addEventListener('click', () => {
 
 document.getElementById('navProfile').addEventListener('click', () => {
   const acc = getAccount();
-  const avatarUrl = (acc && acc.photo) ? acc.photo : 'https://i.pravatar.cc/150?img=47';
-  const displayName = (acc && acc.name) ? acc.name : '@your.account';
+  const avatarUrl = 'https://i.pravatar.cc/150?img=47';
+  const displayName = (acc && acc.email) ? acc.email.split('@')[0] : '@your.account';
   const email = (acc && acc.email) ? acc.email : '';
   openScreen('Profile', `
     <div class="profile-top">
