@@ -1,5 +1,5 @@
 /* ---------------------------------- */
-/* ---------- Firebase Setup ---------- */
+/* ---------- Auth (email + password via Firebase) ---------- */
 const firebaseConfig = {
   apiKey: "AIzaSyAl-LuxyjTr-veAiftzJxyZA7lK4y9UA6s",
   authDomain: "pioneering-flag-453005-g5.firebaseapp.com",
@@ -10,8 +10,6 @@ const firebaseConfig = {
   measurementId: "G-DSCH8MPTGY"
 };
 firebase.initializeApp(firebaseConfig);
-const db = firebase.firestore();
-const storage = firebase.storage();
 
 function getAccount(){
   try {
@@ -36,8 +34,6 @@ function saveAccountAndEnter(user){
   const account = {
     email: user.email,
     uid: user.uid,
-    displayName: user.displayName || user.email.split('@')[0],
-    photoURL: user.photoURL || 'https://i.pravatar.cc/150?img=47',
     createdAt: Date.now()
   };
   localStorage.setItem('bp_account', JSON.stringify(account));
@@ -68,25 +64,32 @@ if (existingAccount){
     loginBtn.disabled = true;
     loginBtn.textContent = 'Please wait...';
 
+    function resetButton(){
+      loginBtn.disabled = false;
+      loginBtn.textContent = 'Log In / Sign Up';
+    }
+
     firebase.auth().signInWithEmailAndPassword(email, password)
       .then((result) => saveAccountAndEnter(result.user))
       .catch((error) => {
         return firebase.auth().createUserWithEmailAndPassword(email, password)
           .then((result) => saveAccountAndEnter(result.user))
           .catch((err) => {
-            authError.textContent = err.message.replace('Firebase: ', '');
+            if (err.code === 'auth/email-already-in-use'){
+              authError.textContent = 'Incorrect password. Please try again.';
+            } else {
+              authError.textContent = err.message.replace('Firebase: ', '');
+            }
             authError.style.display = 'block';
           });
       })
-      .finally(() => {
-        loginBtn.disabled = false;
-        loginBtn.textContent = 'Log In / Sign Up';
-      });
+      .finally(resetButton);
   });
 }
 
 /* ---------------------------------- */
-// Initial Featured Feed Data
+
+// Initial Mix Data (Instagram Style Reels + Featured)
 const REELS = [
   {
     src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
@@ -94,7 +97,15 @@ const REELS = [
     caption: "Welcome to Bharat Play! Ultimate place for Trending Shorts & Reels 🔥 #bharatplay",
     sound: "Nitin Sharma - Original Sound",
     avatar: "https://i.pravatar.cc/100?img=68",
-    likes: "540K", comments: "12.3K", shares: "8.9K", type: "video"
+    likes: "540K", comments: "12.3K", shares: "8.9K"
+  },
+  {
+    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4",
+    user: "insta_reels_india", tag: "Instagram Reel", verified: true,
+    caption: "Trending Instagram Reel 🌸 #reels #trending",
+    sound: "Instagram Trending Audio",
+    avatar: "https://i.pravatar.cc/100?img=47",
+    likes: "890K", comments: "4.5K", shares: "18K"
   }
 ];
 
@@ -112,39 +123,34 @@ const noteIcon = `<svg viewBox="0 0 24 24" fill="white"><path d="M9 18V5l12-2v13
 const verifiedBadge = `<svg viewBox="0 0 24 24" width="15" height="15" style="flex-shrink:0;"><path fill="#3897F0" d="M12 2 14.5 4.2 17.8 3.6 18.8 6.8 21.8 8.4 20.6 11.6 21.8 14.8 18.8 16.4 17.8 19.6 14.5 19 12 21.2 9.5 19 6.2 19.6 5.2 16.4 2.2 14.8 3.4 11.6 2.2 8.4 5.2 6.8 6.2 3.6 9.5 4.2z"/><path fill="white" d="M10.6 14.9 8.4 12.7l1.1-1.1 1.1 1.1 3.1-3.1 1.1 1.1z"/></svg>`;
 
 // Create Reel Element
-function createReelElement(r, prepend = false) {
+function createReelElement(r) {
   const el = document.createElement('div');
   el.className = 'reel';
   el.dataset.isYt = r.isYoutube ? "true" : "false";
   if(r.ytId) el.dataset.ytid = r.ytId;
 
-  let initialMedia = '';
-  if (r.isYoutube) {
-    initialMedia = `<div class="media-box" style="width:100%;height:100%;overflow:hidden;position:relative;"><img src="https://i.ytimg.com/vi/${r.ytId}/hqdefault.jpg" style="width:100%;height:100%;object-fit:cover;"></div>`;
-  } else if (r.type === 'photo') {
-    initialMedia = `<img src="${r.src}" class="feed-media-img" alt="User Post">`;
-  } else {
-    initialMedia = `<video src="${r.src}" loop playsinline muted preload="metadata" style="width:100%;height:100%;object-fit:cover;"></video>`;
-  }
+  const initialMedia = r.isYoutube
+    ? `<div class="media-box" style="width:100%;height:100%;overflow:hidden;position:relative;"><img src="https://i.ytimg.com/vi/${r.ytId}/hqdefault.jpg" style="width:100%;height:100%;object-fit:cover;"></div>`
+    : `<video src="${r.src}" loop playsinline muted preload="metadata" style="width:100%;height:100%;object-fit:cover;"></video>`;
 
   el.innerHTML = `
     ${initialMedia}
     <div class="reel-shade"></div>
     <div class="rail">
       <div class="rail-item">
-        <div class="rail-avatar"><img src="${r.avatar || 'https://i.pravatar.cc/100?img=47'}" alt=""></div>
+        <div class="rail-avatar"><img src="${r.avatar}" alt=""></div>
       </div>
       <div class="rail-item like-item">
         <div class="rail-btn">${heartIcon(false)}</div>
-        <div class="rail-count">${r.likes || '0'}</div>
+        <div class="rail-count">${r.likes}</div>
       </div>
       <div class="rail-item comment-item">
         <div class="rail-btn">${commentIcon}</div>
-        <div class="rail-count">${r.comments || '0'}</div>
+        <div class="rail-count">${r.comments}</div>
       </div>
       <div class="rail-item share-item">
         <div class="rail-btn">${shareIcon}</div>
-        <div class="rail-count">${r.shares || '0'}</div>
+        <div class="rail-count">${r.shares}</div>
       </div>
       <div class="rail-item more-item">
         <div class="rail-btn">${moreIcon}</div>
@@ -154,13 +160,13 @@ function createReelElement(r, prepend = false) {
       <div class="username">
         <span>@${r.user}</span>
         ${r.verified ? verifiedBadge : ''}
-        <span class="tag">${r.tag || 'User Post'}</span>
+        <span class="tag">${r.tag}</span>
         <span class="follow-btn">Follow</span>
       </div>
       <div class="caption">${r.caption}</div>
       <div class="sound">
         <div class="sound-icon">${noteIcon}</div>
-        <div class="marquee-wrap"><div class="marquee">${r.sound || 'Original Sound'} &nbsp;&nbsp;•&nbsp;&nbsp; ${r.sound || 'Original Sound'} &nbsp;&nbsp;•&nbsp;&nbsp;</div></div>
+        <div class="marquee-wrap"><div class="marquee">${r.sound} &nbsp;&nbsp;•&nbsp;&nbsp; ${r.sound} &nbsp;&nbsp;•&nbsp;&nbsp;</div></div>
       </div>
     </div>
   `;
@@ -170,60 +176,47 @@ function createReelElement(r, prepend = false) {
   const commentItem = el.querySelector('.comment-item');
   const shareItem = el.querySelector('.share-item');
   const moreItem = el.querySelector('.more-item');
+  const followBtn = el.querySelector('.follow-btn');
+  let liked = false;
+  let following = false;
 
   el.addEventListener('click', (e) => {
     if (e.target.closest('.rail-item') || e.target.closest('.info')) return;
+    
     if(muted) {
       muted = false;
       updateMuteState();
-      showToast('🔊 Sound ON');
+      showToast('🔊 Sound Turned ON');
     }
+
     if (video) {
       if (video.paused) video.play(); else video.pause();
     }
   });
 
   likeItem.addEventListener('click', () => {
-    let liked = likeItem.classList.toggle('liked');
+    liked = !liked;
+    likeItem.classList.toggle('liked', liked);
     likeItem.querySelector('.rail-btn').innerHTML = heartIcon(liked);
+  });
+
+  followBtn.addEventListener('click', () => {
+    following = !following;
+    followBtn.textContent = following ? 'Following' : 'Follow';
+    followBtn.style.background = following ? 'rgba(255,255,255,0.2)' : 'transparent';
+    showToast(following ? `You are now following @${r.user}` : `Unfollowed @${r.user}`);
   });
 
   commentItem.addEventListener('click', () => openComments(r));
   shareItem.addEventListener('click', () => openShare(r));
   moreItem.addEventListener('click', () => openMore(r));
 
-  if (prepend) {
-    feed.insertBefore(el, feed.firstChild);
-  } else {
-    feed.appendChild(el);
-  }
-  
-  observeVideos();
   return el;
 }
 
-REELS.forEach(r => createReelElement(r));
+REELS.forEach(r => feed.appendChild(createReelElement(r)));
 
-// Fetch Live User Posts from Firestore Database
-function loadUserPostsFromFirestore() {
-  db.collection('posts').orderBy('timestamp', 'desc').get().then((snapshot) => {
-    snapshot.forEach((doc) => {
-      const post = doc.data();
-      createReelElement({
-        src: post.mediaUrl,
-        user: post.userName || 'user',
-        tag: 'User Upload',
-        caption: post.caption || '',
-        sound: post.sound || `${post.userName} - Original Sound`,
-        avatar: post.userPhoto || 'https://i.pravatar.cc/100?img=47',
-        likes: '0', comments: '0', shares: '0',
-        type: post.type || 'video'
-      }, true); // Prepend to top of feed
-    });
-  }).catch(err => console.log('Firestore fetch error:', err));
-}
-
-// Fetch YouTube Trending Shorts
+// Fetch Live YouTube Trending Shorts
 async function loadYouTubeTrendingShorts() {
   if (isLoadingMore) return;
   isLoadingMore = true;
@@ -231,26 +224,34 @@ async function loadYouTubeTrendingShorts() {
   try {
     const res = await fetch('https://pipedapi.kavin.rocks/trending?region=IN');
     const data = await res.json();
+    
+    // Pick random trending shorts
     const items = data.sort(() => 0.5 - Math.random()).slice(0, 10);
 
-    items.forEach((v) => {
+    items.forEach((v, index) => {
       const ytId = v.url ? v.url.split('=')[1] : null;
       if(!ytId) return;
 
-      createReelElement({
+      const isShorts = (v.duration && v.duration < 60) || Math.random() > 0.3;
+
+      const ytReel = {
         isYoutube: true,
         ytId: ytId,
         user: (v.uploaderName || "shorts_creator").toLowerCase().replace(/\s+/g, '_'),
-        tag: "YouTube Shorts 🔥",
+        tag: isShorts ? "YouTube Shorts 🔥" : "Trending Reel",
         verified: v.uploaderVerified || false,
-        caption: v.title || "Trending Short Video #shorts",
+        caption: v.title || "Trending Short Video #shorts #bharatplay",
         sound: `${v.uploaderName || "Trending"} - Original Sound`,
         avatar: v.uploaderAvatar || `https://i.pravatar.cc/100?img=${Math.floor(Math.random() * 50) + 1}`,
         likes: `${(Math.floor(Math.random() * 90) + 10)}K`,
         comments: `${(Math.floor(Math.random() * 8) + 1)}K`,
         shares: `${(Math.floor(Math.random() * 5) + 1)}K`
-      });
+      };
+
+      feed.appendChild(createReelElement(ytReel));
     });
+
+    observeVideos();
 
   } catch(e) {
     console.log("Error loading trending:", e);
@@ -259,7 +260,7 @@ async function loadYouTubeTrendingShorts() {
   }
 }
 
-// Lazy Load Observer
+// Lazy Load & Full Screen Zoom Observer
 let observer;
 function observeVideos() {
   const reelEls = [...document.querySelectorAll('.reel')];
@@ -283,6 +284,13 @@ function observeVideos() {
           video.muted = muted;
           video.play().catch(()=>{});
         }
+
+        // Auto load more when 3 reels remaining
+        const currentIndex = reelEls.indexOf(el);
+        if (currentIndex >= reelEls.length - 3) {
+          loadYouTubeTrendingShorts();
+        }
+
       } else {
         if(isYt && ytId) {
           const mediaBox = el.querySelector('.media-box');
@@ -300,11 +308,21 @@ function observeVideos() {
 }
 
 function updateMuteState() {
-  document.querySelectorAll('video').forEach(v => v.muted = muted);
+  const videos = [...document.querySelectorAll('video')];
+  videos.forEach(v => v.muted = muted);
+
   const activeYtBox = document.querySelector('.reel .media-box iframe');
   if(activeYtBox) {
     let src = activeYtBox.src;
-    activeYtBox.src = muted ? src.replace('mute=0', 'mute=1') : src.replace('mute=1', 'mute=0');
+    src = muted ? src.replace('mute=0', 'mute=1') : src.replace('mute=1', 'mute=0');
+    activeYtBox.src = src;
+  }
+
+  const muteBtn = document.getElementById('muteBtn');
+  if(muteBtn) {
+    muteBtn.innerHTML = muted
+      ? `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`
+      : `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18 6a9 9 0 0 1 0 12"/></svg>`;
   }
 }
 
@@ -318,7 +336,7 @@ if(muteBtn) {
 }
 
 // Init
-loadUserPostsFromFirestore();
+observeVideos();
 loadYouTubeTrendingShorts();
 
 /* ---------- Toast ---------- */
@@ -334,7 +352,7 @@ function showToast(msg){
   toast.textContent = msg;
   toast.classList.add('show');
   clearTimeout(toastTimer);
-  toastTimer = setTimeout(() => toast.classList.remove('show'), 2000);
+  toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
 }
 
 /* ---------- Bottom sheet ---------- */
@@ -347,26 +365,65 @@ function openSheet(html){
 function closeSheet(){ sheetOverlay.classList.remove('open'); }
 sheetOverlay.addEventListener('click', (e) => { if(e.target === sheetOverlay) closeSheet(); });
 
+const SAMPLE_COMMENTS = [
+  { user: "aisha.k", text: "This is amazing! 🔥", avatar: "https://i.pravatar.cc/60?img=5" },
+  { user: "rohit_singh", text: "How did you do this, so good 😍", avatar: "https://i.pravatar.cc/60?img=8" },
+  { user: "priya.here", text: "When is the next part coming?", avatar: "https://i.pravatar.cc/60?img=9" },
+  { user: "dev.codes", text: "Bharat Play is the best app 🇮🇳", avatar: "https://i.pravatar.cc/60?img=14" },
+];
 function openComments(r){
-  openSheet(`<div class="sheet-title">Comments</div>
-    <div style="font-size:13px;color:var(--text-dim);text-align:center;padding:20px 0;">No comments yet. Be the first to comment!</div>`);
+  const rows = SAMPLE_COMMENTS.map(c => `
+    <div class="comment-row">
+      <img src="${c.avatar}" alt="">
+      <div>
+        <div class="comment-user">@${c.user}</div>
+        <div class="comment-text">${c.text}</div>
+      </div>
+    </div>
+  `).join('');
+  openSheet(`<div class="sheet-title">${r.comments} Comments</div>${rows}
+    <div style="font-size:12px;color:var(--text-faint);text-align:center;margin-top:10px;">
+      Posting comments will work once a backend is connected
+    </div>`);
 }
 function openShare(r){
-  openSheet(`<div class="sheet-title">Share</div>
-    <div style="text-align:center;padding:15px;font-size:14px;color:var(--text-dim);">Post link copied to clipboard!</div>`);
-  showToast('Link copied!');
+  const opts = [
+    ["💬","WhatsApp"], ["📋","Copy link"], ["📩","Message"], ["📸","Instagram"], ["👥","Friends"], ["⋯","More"]
+  ];
+  const grid = opts.map(([icon,label]) => `
+    <div class="share-opt" data-label="${label}">
+      <div class="share-circle">${icon}</div>
+      <span>${label}</span>
+    </div>
+  `).join('');
+  openSheet(`<div class="sheet-title">Share @${r.user}'s reel</div><div class="share-grid">${grid}</div>`);
+  sheetContent.querySelectorAll('.share-opt').forEach(opt => {
+    opt.addEventListener('click', () => {
+      closeSheet();
+      showToast(`Shared via ${opt.dataset.label} (demo)`);
+    });
+  });
 }
 function openMore(r){
-  openSheet(`<div class="sheet-title">Options</div>
-    <div class="more-opt" onclick="closeSheet(); showToast('Saved!')">🔖 Save Post</div>
-    <div class="more-opt" style="color:#ff5c5c;" onclick="closeSheet(); showToast('Reported')">⚠️ Report</div>`);
+  openSheet(`
+    <div class="sheet-title">Options</div>
+    <div class="more-opt">🔖 Save</div>
+    <div class="more-opt">🔇 Mute @${r.user}</div>
+    <div class="more-opt">🚫 Not interested</div>
+    <div class="more-opt" style="color:#ff5c5c;">⚠️ Report</div>
+  `);
+  sheetContent.querySelectorAll('.more-opt').forEach(opt => {
+    opt.addEventListener('click', () => { closeSheet(); showToast('Done ✓'); });
+  });
 }
 
-/* ---------- Navigation Panels ---------- */
+/* ---------- Full screen panels ---------- */
 const screenOverlay = document.getElementById('screenOverlay');
 const screenTitle = document.getElementById('screenTitle');
 const screenBody = document.getElementById('screenBody');
-document.getElementById('screenBack').addEventListener('click', () => screenOverlay.classList.remove('open'));
+document.getElementById('screenBack').addEventListener('click', () => {
+  screenOverlay.classList.remove('open');
+});
 
 function openScreen(title, html){
   screenTitle.textContent = title;
@@ -374,192 +431,76 @@ function openScreen(title, html){
   screenOverlay.classList.add('open');
 }
 
-// --- CREATE / UPLOAD POST SCREEN ---
-document.getElementById('navCreate').addEventListener('click', () => {
-  openScreen('Create New Post', `
-    <div class="form-group">
-      <label>Select Photo or Video</label>
-      <div class="file-picker-box" onclick="document.getElementById('postFileInput').click()">
-        <div class="icon">📁</div>
-        <div class="text" id="filePickLabel">Click to choose video/photo from gallery</div>
-      </div>
-      <input type="file" id="postFileInput" accept="video/*,image/*" style="display:none;">
-    </div>
+function emptyState(icon, title, sub){
+  return `<div class="empty-state"><div class="big">${icon}</div><div class="title">${title}</div><div class="sub">${sub}</div></div>`;
+}
 
-    <div class="form-group">
-      <label>Caption</label>
-      <textarea id="postCaptionInput" rows="3" placeholder="Write a caption or add hashtags..."></textarea>
-    </div>
-
-    <button class="btn-primary" id="uploadPostBtn">Publish Post</button>
-
-    <div class="progress-wrap" id="uploadProgressWrap">
-      <div class="progress-bar-bg"><div class="progress-bar-fill" id="uploadProgressBar"></div></div>
-      <div class="progress-text" id="uploadProgressText">Uploading... 0%</div>
-    </div>
+document.getElementById('navSearch').addEventListener('click', () => {
+  openScreen('Search', `
+    <input class="search-input" placeholder="Search reels, shorts, hashtags...">
+    ${emptyState('🔍','Search something','Type a name, hashtag, or sound to find reels')}
   `);
-
-  const fileInput = document.getElementById('postFileInput');
-  const fileLabel = document.getElementById('filePickLabel');
-  let selectedFile = null;
-
-  fileInput.addEventListener('change', (e) => {
-    if (e.target.files.length > 0) {
-      selectedFile = e.target.files[0];
-      fileLabel.textContent = `Selected: ${selectedFile.name}`;
-    }
-  });
-
-  document.getElementById('uploadPostBtn').addEventListener('click', () => {
-    if (!selectedFile) {
-      showToast('Please select a photo or video first!');
-      return;
-    }
-
-    const caption = document.getElementById('postCaptionInput').value.trim();
-    const acc = getAccount() || { displayName: 'User', photoURL: 'https://i.pravatar.cc/150?img=47' };
-    const isVideo = selectedFile.type.startsWith('video');
-
-    const progressWrap = document.getElementById('uploadProgressWrap');
-    const progressBar = document.getElementById('uploadProgressBar');
-    const progressText = document.getElementById('uploadProgressText');
-    
-    progressWrap.style.display = 'block';
-
-    const storageRef = storage.ref(`user_posts/${Date.now()}_${selectedFile.name}`);
-    const uploadTask = storageRef.put(selectedFile);
-
-    uploadTask.on('state_changed', 
-      (snapshot) => {
-        const pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-        progressBar.style.width = pct + '%';
-        progressText.textContent = `Uploading... ${pct}%`;
-      }, 
-      (error) => {
-        showToast('Upload failed: ' + error.message);
-      }, 
-      () => {
-        uploadTask.snapshot.ref.getDownloadURL().then((downloadURL) => {
-          // Save Post Entry in Firestore
-          const postData = {
-            mediaUrl: downloadURL,
-            caption: caption,
-            userName: acc.displayName,
-            userPhoto: acc.photoURL,
-            type: isVideo ? 'video' : 'photo',
-            timestamp: firebase.firestore.FieldValue.serverTimestamp()
-          };
-
-          db.collection('posts').add(postData).then(() => {
-            showToast('🎉 Post published successfully!');
-            screenOverlay.classList.remove('open');
-            // Show new post directly in feed
-            createReelElement({
-              src: downloadURL,
-              user: acc.displayName,
-              tag: 'Your Post',
-              caption: caption,
-              sound: `${acc.displayName} - Original Sound`,
-              avatar: acc.photoURL,
-              likes: '0', comments: '0', shares: '0',
-              type: isVideo ? 'video' : 'photo'
-            }, true);
-          });
-        });
-      }
-    );
-  });
 });
 
-// --- PROFILE & EDIT PROFILE SCREEN ---
-document.getElementById('navProfile').addEventListener('click', renderProfileScreen);
+document.getElementById('navCreate').addEventListener('click', () => {
+  openScreen('Create New Reel', `
+    <div class="create-opt"><div class="ic">🎥</div><div><b>Record</b><span>Shoot directly with your camera</span></div></div>
+    <div class="create-opt"><div class="ic">🖼️</div><div><b>Choose from gallery</b><span>Upload a video you already have</span></div></div>
+    <div class="create-opt"><div class="ic">🎵</div><div><b>Trending sounds</b><span>Browse popular music</span></div></div>
+    ${emptyState('🎬','Upload is a demo feature right now','Connecting a real backend (like Firebase Storage) will make this work')}
+  `);
+});
 
-function renderProfileScreen() {
-  const acc = getAccount() || { displayName: 'User', photoURL: 'https://i.pravatar.cc/150?img=47', email: '' };
+document.getElementById('navLikes').addEventListener('click', () => {
+  openScreen('Liked Reels', emptyState('❤️','No liked reels yet','Reels you like will show up here'));
+});
 
-  openScreen('My Profile', `
+document.getElementById('navProfile').addEventListener('click', () => {
+  const acc = getAccount();
+  const avatarUrl = 'https://i.pravatar.cc/150?img=47';
+  const displayName = (acc && acc.email) ? acc.email.split('@')[0] : '@your.account';
+  const email = (acc && acc.email) ? acc.email : '';
+  openScreen('Profile', `
     <div class="profile-top">
-      <div class="profile-avatar-wrap">
-        <img src="${acc.photoURL}" id="profileDisplayImg" alt="">
-      </div>
-      <div class="pname" id="profileDisplayName">${acc.displayName}</div>
-      <div style="color:var(--text-faint);font-size:12px;margin-top:2px;">${acc.email}</div>
-      
-      <button class="btn-secondary" id="editProfileBtn" style="width: auto; padding: 6px 16px; margin-top: 10px;">Edit Profile</button>
-
+      <img src="${avatarUrl}" alt="">
+      <div class="pname">${displayName}</div>
+      ${email ? `<div style="color:var(--text-faint);font-size:12px;margin-top:2px;">${email}</div>` : ''}
       <div class="profile-stats">
-        <div><b>0</b><span>Posts</span></div>
+        <div><b>0</b><span>Reels</span></div>
         <div><b>0</b><span>Followers</span></div>
         <div><b>0</b><span>Following</span></div>
       </div>
     </div>
-
-    <div style="text-align:center;margin-top:30px;">
-      <button id="logoutBtn" class="btn-secondary" style="background:none;border:1px solid rgba(255,255,255,0.25);color:var(--white);">Log out</button>
+    ${emptyState('🎞️','No reels posted yet','Post your first reel from the Create tab')}
+    <div style="text-align:center;margin-top:24px;">
+      <button id="logoutBtn" style="background:none;border:1px solid rgba(255,255,255,0.25);color:var(--white);padding:9px 20px;border-radius:8px;font-size:13px;font-weight:600;">Log out</button>
+    </div>
+    <div style="text-align:center;margin-top:26px;font-size:11px;color:var(--text-faint);line-height:1.6;">
+      Bharat Play<br>Founded &amp; owned by Nitin Sharma ✔
     </div>
   `);
-
   document.getElementById('logoutBtn').addEventListener('click', () => {
     localStorage.removeItem('bp_account');
     location.reload();
   });
+});
 
-  document.getElementById('editProfileBtn').addEventListener('click', () => {
-    openSheet(`
-      <div class="sheet-title">Edit Profile</div>
-      
-      <div class="form-group">
-        <label>Account Display Name</label>
-        <input type="text" id="editNameInput" value="${acc.displayName}">
-      </div>
+document.getElementById('tabFollowing').addEventListener('click', () => {
+  document.getElementById('tabFollowing').classList.add('active');
+  document.getElementById('tabReels').classList.remove('active');
+  openScreen('Following', emptyState('👥','Not following anyone yet','Reels from people you follow will show up here'));
+  setTimeout(() => {
+    document.getElementById('tabFollowing').classList.remove('active');
+    document.getElementById('tabReels').classList.add('active');
+  }, 300);
+});
 
-      <div class="form-group">
-        <label>Change Profile Photo</label>
-        <input type="file" id="editAvatarInput" accept="image/*">
-      </div>
-
-      <button class="btn-primary" id="saveProfileBtn">Save Changes</button>
-    `);
-
-    document.getElementById('saveProfileBtn').addEventListener('click', () => {
-      const newName = document.getElementById('editNameInput').value.trim();
-      const avatarFile = document.getElementById('editAvatarInput').files[0];
-
-      if (!newName) {
-        showToast('Name cannot be empty!');
-        return;
-      }
-
-      acc.displayName = newName;
-
-      if (avatarFile) {
-        showToast('Updating photo...');
-        const storageRef = storage.ref(`avatars/${acc.uid}_${Date.now()}`);
-        storageRef.put(avatarFile).then(snapshot => snapshot.ref.getDownloadURL()).then(url => {
-          acc.photoURL = url;
-          localStorage.setItem('bp_account', JSON.stringify(acc));
-          closeSheet();
-          showToast('Profile updated!');
-          renderProfileScreen();
-        });
-      } else {
-        localStorage.setItem('bp_account', JSON.stringify(acc));
-        closeSheet();
-        showToast('Profile updated!');
-        renderProfileScreen();
-      }
-    });
+// Remove service workers
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.getRegistrations().then((regs) => {
+    regs.forEach((reg) => reg.unregister());
   });
 }
-
-document.getElementById('navSearch').addEventListener('click', () => {
-  openScreen('Search', `<input class="search-input" placeholder="Search accounts, posts, hashtags...">`);
-});
-document.getElementById('navLikes').addEventListener('click', () => {
-  openScreen('Liked Posts', `<div class="empty-state"><div class="big">❤️</div><div class="title">No liked posts yet</div></div>`);
-});
-
-// Remove old service workers
-if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((reg) => reg.unregister()));
+if (window.caches) {
+  caches.keys().then((names) => names.forEach((n) => caches.delete(n)));
 }
