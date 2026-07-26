@@ -106,14 +106,6 @@ const REELS = [
     sound: "Riya - Original audio",
     avatar: "https://i.pravatar.cc/100?img=47",
     likes: "128K", comments: "842", shares: "310"
-  },
-  {
-    src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-    user: "foodie_raj", tag: "Food",
-    caption: "Homemade street-style pani puri 😋 drop a comment if you want the recipe! #food #streetfood",
-    sound: "Original audio - foodie_raj",
-    avatar: "https://i.pravatar.cc/100?img=12",
-    likes: "64.2K", comments: "1.2K", shares: "980"
   }
 ];
 
@@ -134,9 +126,9 @@ function createReelElement(r) {
   const el = document.createElement('div');
   el.className = 'reel';
   
-  // Check if YouTube Embed or Normal MP4 Video
+  // FIX: Added autoplay=1 & mute=1 for YouTube embeds
   const videoMedia = r.isYoutube 
-    ? `<iframe src="https://www.youtube.com/embed/${r.ytId}?autoplay=0&controls=0&loop=1&playlist=${r.ytId}&rel=0&enablejsapi=1" style="width:100%;height:100%;border:none;pointer-events:none;" allow="autoplay; encrypted-media"></iframe>`
+    ? `<iframe src="https://www.youtube.com/embed/${r.ytId}?autoplay=1&mute=1&controls=0&loop=1&playlist=${r.ytId}&rel=0&enablejsapi=1&playsinline=1" style="width:100%;height:100%;border:none;" allow="autoplay; encrypted-media" allowfullscreen></iframe>`
     : `<video src="${r.src}" loop playsinline muted preload="metadata"></video>`;
 
   el.innerHTML = `
@@ -251,7 +243,6 @@ async function loadYouTubeTrending() {
       feed.appendChild(reelEl);
     });
 
-    // Re-observe newly added videos
     observeVideos();
 
   } catch(e) {
@@ -458,7 +449,7 @@ document.getElementById('tabFollowing').addEventListener('click', () => {
   }, 300);
 });
 
-// Remove any previously installed service worker
+// Remove service workers
 if ("serviceWorker" in navigator) {
   navigator.serviceWorker.getRegistrations().then((regs) => {
     regs.forEach((reg) => reg.unregister());
