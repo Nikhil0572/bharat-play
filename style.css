@@ -397,10 +397,9 @@
   .auth-back{ margin-top:16px; color:var(--text-dim); font-size:13px; font-weight:600; }
   .auth-note{ color:var(--text-faint); font-size:11px; text-align:center; margin-top:28px; line-height:1.6; }
   .auth-credit{ color:var(--text-faint); font-size:11px; text-align:center; margin-top:14px; }
-  .google-btn{
-    width:100%; display:flex; align-items:center; justify-content:center; gap:12px;
-    background:var(--white); border:none; border-radius:10px; padding:14px;
-    font-weight:700; font-size:15px; color:#1f1f1f;
+  .auth-input-solo{
+    width:100%; border:1px solid rgba(255,255,255,0.2); border-radius:10px;
+    background:none; color:var(--white); padding:14px; font-size:14px; outline:none;
   }
-  .google-btn:disabled{ opacity:0.6; }
-  .google-btn:active{ transform: scale(0.98); }
+  .auth-input-solo::placeholder{ color:var(--text-faint); }
+  .auth-input-solo:focus{ border-color:var(--saffron); }
