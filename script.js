@@ -70,23 +70,26 @@ if (existingAccount){
       loginBtn.textContent = 'Log In / Sign Up';
     }
 
-    // Try logging in first. If the account doesn't exist yet, create it
-    // automatically — this gives a single-step login-or-signup experience.
+    // Try logging in first. If the account doesn't exist yet (Firebase may
+    // report this as 'auth/user-not-found' or, on newer SDK versions,
+    // the more generic 'auth/invalid-credential'), fall back to creating
+    // a new account automatically — this gives a single-step login-or-signup
+    // experience without us needing to know in advance which case it is.
     firebase.auth().signInWithEmailAndPassword(email, password)
       .then((result) => saveAccountAndEnter(result.user))
       .catch((error) => {
-        if (error.code === 'auth/user-not-found'){
-          return firebase.auth().createUserWithEmailAndPassword(email, password)
-            .then((result) => saveAccountAndEnter(result.user))
-            .catch((err) => {
+        return firebase.auth().createUserWithEmailAndPassword(email, password)
+          .then((result) => saveAccountAndEnter(result.user))
+          .catch((err) => {
+            if (err.code === 'auth/email-already-in-use'){
+              // Account exists after all — the original sign-in failure
+              // really was a wrong password.
+              authError.textContent = 'Incorrect password. Please try again.';
+            } else {
               authError.textContent = err.message.replace('Firebase: ', '');
-              authError.style.display = 'block';
-            });
-        }
-        authError.textContent = error.code === 'auth/wrong-password'
-          ? 'Incorrect password. Please try again.'
-          : error.message.replace('Firebase: ', '');
-        authError.style.display = 'block';
+            }
+            authError.style.display = 'block';
+          });
       })
       .finally(resetButton);
   });
