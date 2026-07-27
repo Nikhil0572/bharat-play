@@ -135,24 +135,23 @@ function setupObserver(){
     entries.forEach(entry => {
       const el = entry.target;
       if(entry.isIntersecting && entry.intersectionRatio > 0.6){
+        // Play local video
         const v = el.querySelector('video');
         if(v){ v.muted = muted; v.play().catch(()=>{}); }
+        // Load YouTube iframe only when visible
         const iframe = el.querySelector('iframe');
-        if(iframe){
+        if(iframe && iframe.dataset.vid){
           const muteVal = muted ? 'mute=1' : 'mute=0';
-          // Always reload with autoplay=1 when reel becomes visible
-          const base = (iframe.dataset.src || iframe.src || '').split('?')[0];
-          if(base.includes('youtube')){
-            iframe.src = `${base}?autoplay=1&${muteVal}&loop=1&playlist=${iframe.dataset.vid}&playsinline=1&rel=0&modestbranding=1&controls=0&enablejsapi=1`;
-          }
+          iframe.src = `https://www.youtube.com/embed/${iframe.dataset.vid}?autoplay=1&${muteVal}&loop=1&playlist=${iframe.dataset.vid}&playsinline=1&rel=0&modestbranding=1&controls=1&enablejsapi=1`;
         }
       } else {
+        // Pause local video
         const v = el.querySelector('video');
         if(v) v.pause();
+        // Fully unload YouTube iframe to stop audio/video
         const iframe = el.querySelector('iframe');
-        if(iframe && iframe.src && iframe.src.includes('youtube')){
-          // Pause by setting autoplay=0
-          iframe.src = iframe.src.replace('autoplay=1','autoplay=0');
+        if(iframe && iframe.dataset.vid && iframe.src && iframe.src !== 'about:blank'){
+          iframe.src = 'about:blank';
         }
       }
     });
@@ -287,13 +286,13 @@ document.addEventListener('click', () => {
   muted = false;
   const muteBtn = document.getElementById('muteBtn');
   if(muteBtn) muteBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18 6a9 9 0 0 1 0 12"/></svg>`;
-  // Reload all currently visible iframes with sound + autoplay
-  document.querySelectorAll('.reel iframe').forEach(iframe => {
-    const vid = iframe.dataset.vid;
-    if(vid){
-      iframe.src = `https://www.youtube.com/embed/${vid}?autoplay=1&mute=0&loop=1&playlist=${vid}&playsinline=1&rel=0&modestbranding=1&controls=0&enablejsapi=1`;
-    }
-  });
+  // Only reload the ONE currently visible iframe with sound
+  const visibleIframe = [...document.querySelectorAll('.reel iframe')].find(iframe =>
+    iframe.src && iframe.src.includes('youtube') && iframe.src !== 'about:blank'
+  );
+  if(visibleIframe && visibleIframe.dataset.vid){
+    visibleIframe.src = `https://www.youtube.com/embed/${visibleIframe.dataset.vid}?autoplay=1&mute=0&loop=1&playlist=${visibleIframe.dataset.vid}&playsinline=1&rel=0&modestbranding=1&controls=1&enablejsapi=1`;
+  }
   document.querySelectorAll('.reel video').forEach(v => { v.muted = false; v.play().catch(()=>{}); });
 }, { once: true });
 
@@ -301,13 +300,13 @@ const muteBtn = document.getElementById('muteBtn');
 muteBtn.addEventListener('click', () => {
   muted = !muted;
   document.querySelectorAll('.reel video').forEach(v => v.muted = muted);
-  document.querySelectorAll('.reel iframe').forEach(iframe => {
-    if(iframe.src && iframe.src.includes('youtube')){
-      iframe.src = iframe.src
-        .replace('mute=1', muted ? 'mute=1' : 'mute=0')
-        .replace('mute=0', muted ? 'mute=1' : 'mute=0');
-    }
-  });
+  // Only affect the visible iframe
+  const visibleIframe = [...document.querySelectorAll('.reel iframe')].find(iframe =>
+    iframe.src && iframe.src.includes('youtube') && iframe.src !== 'about:blank'
+  );
+  if(visibleIframe && visibleIframe.dataset.vid){
+    visibleIframe.src = `https://www.youtube.com/embed/${visibleIframe.dataset.vid}?autoplay=1&mute=${muted?1:0}&loop=1&playlist=${visibleIframe.dataset.vid}&playsinline=1&rel=0&modestbranding=1&controls=1&enablejsapi=1`;
+  }
   muteBtn.innerHTML = muted
     ? `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><line x1="23" y1="9" x2="17" y2="15"></line><line x1="17" y1="9" x2="23" y2="15"></line></svg>`
     : `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18 6a9 9 0 0 1 0 12"/></svg>`;
