@@ -226,9 +226,10 @@ function buildReelEl(r){
   return el;
 }
 
-async function fetchYoutubeTrending(){
+async function fetchYoutubeTrending(category = ''){
   try {
-    const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=IN&maxResults=15&key=${YOUTUBE_API_KEY}`);
+    const catParam = category ? `&videoCategoryId=${category}` : '';
+    const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=IN&maxResults=20${catParam}&key=${YOUTUBE_API_KEY}`);
     const data = await res.json();
     if(!data.items) return [];
     return data.items.map(item => ({
@@ -245,6 +246,36 @@ async function fetchYoutubeTrending(){
   } catch(e){ console.error('YT fetch failed',e); return []; }
 }
 
+// YouTube category IDs for India trending variety
+const YT_CATEGORIES = ['', '10', '24', '23', '20', '22', '17', '28'];
+let categoryIndex = 0;
+let loadingMore = false;
+let allVideos = [];
+
+function addLoadMoreTrigger(){
+  const trigger = document.createElement('div');
+  trigger.id = 'load-more-trigger';
+  trigger.style.cssText = 'height:2px;width:100%;';
+  feed.appendChild(trigger);
+
+  const triggerObserver = new IntersectionObserver(async (entries) => {
+    if(entries[0].isIntersecting && !loadingMore){
+      loadingMore = true;
+      const cat = YT_CATEGORIES[categoryIndex % YT_CATEGORIES.length];
+      categoryIndex++;
+      const more = await fetchYoutubeTrending(cat);
+      // Filter out duplicates
+      const newVideos = more.filter(v => !allVideos.includes(v.videoId));
+      newVideos.forEach(v => allVideos.push(v.videoId));
+      feed.removeChild(trigger);
+      newVideos.forEach(r => feed.appendChild(buildReelEl(r)));
+      addLoadMoreTrigger(); // Add trigger again at new end
+      loadingMore = false;
+    }
+  }, { threshold: 0.1 });
+  triggerObserver.observe(trigger);
+}
+
 setupObserver();
 (async()=>{
   feed.appendChild(buildReelEl(FOUNDER_REEL));
@@ -256,14 +287,18 @@ setupObserver();
   loadEl.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:rgba(255,255,255,0.5);gap:14px;background:#07070a;"><div style="width:38px;height:38px;border:3px solid rgba(255,153,51,0.3);border-top-color:#FF9933;border-radius:50%;animation:spin 0.9s linear infinite;"></div><span style="font-size:13px;">Loading India trending...</span></div>`;
   feed.appendChild(loadEl);
 
-  const trending = await fetchYoutubeTrending();
+  // Fetch first batch (general trending)
+  const trending = await fetchYoutubeTrending('');
   feed.removeChild(loadEl);
   if(trending.length===0){
     const e2=document.createElement('div'); e2.className='reel';
     e2.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;height:100%;color:rgba(255,255,255,0.4);background:#07070a;font-size:14px;text-align:center;padding:40px;">Could not load trending videos. Check your connection.</div>`;
     feed.appendChild(e2); return;
   }
+  trending.forEach(v => allVideos.push(v.videoId));
   trending.forEach(r=>feed.appendChild(buildReelEl(r)));
+  categoryIndex = 1; // Start from music category next
+  addLoadMoreTrigger(); // Infinite scroll trigger
 })();
 
 let userInteracted = false;
