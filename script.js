@@ -229,10 +229,13 @@ function buildReelEl(r){
 async function fetchYoutubeTrending(category = ''){
   try {
     const catParam = category ? `&videoCategoryId=${category}` : '';
-    const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=IN&maxResults=20${catParam}&key=${YOUTUBE_API_KEY}`);
+    // Add timestamp to avoid any browser caching
+    const res = await fetch(`https://www.googleapis.com/youtube/v3/videos?part=snippet,statistics&chart=mostPopular&regionCode=IN&maxResults=20${catParam}&key=${YOUTUBE_API_KEY}&_t=${Date.now()}`);
     const data = await res.json();
     if(!data.items) return [];
-    return data.items.map(item => ({
+    // Shuffle results so order feels fresh every time
+    const items = data.items.sort(() => Math.random() - 0.5);
+    return items.map(item => ({
       type:'youtube', videoId:item.id,
       user: item.snippet.channelTitle.toLowerCase().replace(/[^a-z0-9]/g,'_').substring(0,20),
       tag: (item.snippet.tags&&item.snippet.tags[0])?item.snippet.tags[0].substring(0,12):'Trending',
@@ -287,18 +290,40 @@ setupObserver();
   loadEl.innerHTML = `<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;color:rgba(255,255,255,0.5);gap:14px;background:#07070a;"><div style="width:38px;height:38px;border:3px solid rgba(255,153,51,0.3);border-top-color:#FF9933;border-radius:50%;animation:spin 0.9s linear infinite;"></div><span style="font-size:13px;">Loading India trending...</span></div>`;
   feed.appendChild(loadEl);
 
-  // Fetch first batch (general trending)
-  const trending = await fetchYoutubeTrending('');
+  // Fetch from 3 categories simultaneously for instant variety
+  const [general, music, entertainment] = await Promise.all([
+    fetchYoutubeTrending(''),
+    fetchYoutubeTrending('10'),  // Music
+    fetchYoutubeTrending('24'),  // Entertainment
+  ]);
+
+  // Interleave results: 1 general, 1 music, 1 entertainment, repeat
+  const combined = [];
+  const maxLen = Math.max(general.length, music.length, entertainment.length);
+  for(let i = 0; i < maxLen; i++){
+    if(general[i]) combined.push(general[i]);
+    if(music[i]) combined.push(music[i]);
+    if(entertainment[i]) combined.push(entertainment[i]);
+  }
+
+  // Deduplicate by videoId
+  const seen = new Set();
+  const unique = combined.filter(v => {
+    if(seen.has(v.videoId)) return false;
+    seen.add(v.videoId);
+    allVideos.push(v.videoId);
+    return true;
+  });
+
   feed.removeChild(loadEl);
-  if(trending.length===0){
-    const e2=document.createElement('div'); e2.className='reel';
-    e2.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;height:100%;color:rgba(255,255,255,0.4);background:#07070a;font-size:14px;text-align:center;padding:40px;">Could not load trending videos. Check your connection.</div>`;
+  if(unique.length === 0){
+    const e2 = document.createElement('div'); e2.className = 'reel';
+    e2.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:rgba(255,255,255,0.4);background:#07070a;font-size:14px;text-align:center;padding:40px;">Could not load trending videos. Check your connection.</div>`;
     feed.appendChild(e2); return;
   }
-  trending.forEach(v => allVideos.push(v.videoId));
-  trending.forEach(r=>feed.appendChild(buildReelEl(r)));
-  categoryIndex = 1; // Start from music category next
-  addLoadMoreTrigger(); // Infinite scroll trigger
+  unique.forEach(r => feed.appendChild(buildReelEl(r)));
+  categoryIndex = 3; // Continue from next category on infinite scroll
+  addLoadMoreTrigger();
 })();
 
 let userInteracted = false;
