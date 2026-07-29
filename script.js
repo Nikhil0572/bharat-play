@@ -11,6 +11,241 @@ const firebaseConfig = {
   measurementId: "G-DSCH8MPTGY"
 };
 firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
+
+/* ---------- Profile helpers (Firestore) ---------- */
+async function getUserProfile(uid){
+  try {
+    const doc = await db.collection('users').doc(uid).get();
+    return doc.exists ? doc.data() : null;
+  } catch(e){ return null; }
+}
+
+async function saveUserProfile(uid, data){
+  await db.collection('users').doc(uid).set(data, { merge: true });
+  // Update localStorage too
+  const acc = getAccount();
+  if(acc){ localStorage.setItem('bp_account', JSON.stringify({ ...acc, ...data })); }
+}
+
+async function savePost(uid, post){
+  await db.collection('posts').add({
+    uid,
+    ...post,
+    createdAt: firebase.firestore.FieldValue.serverTimestamp()
+  });
+}
+
+async function getUserPosts(uid){
+  try {
+    const snap = await db.collection('posts').where('uid','==',uid).orderBy('createdAt','desc').limit(20).get();
+    return snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch(e){ return []; }
+}
+
+/* ---------- Image to base64 helper ---------- */
+function fileToBase64(file, maxSizeKB = 500){
+  return new Promise((resolve, reject) => {
+    if(file.size > maxSizeKB * 1024 * 1.5){
+      reject(new Error(`File too large. Please use an image under ${maxSizeKB}KB.`));
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+/* ---------- Profile edit screen ---------- */
+async function openProfileEdit(){
+  const acc = getAccount();
+  if(!acc) return;
+  const profile = await getUserProfile(acc.uid) || {};
+  const currentName = profile.displayName || acc.email.split('@')[0];
+  const currentBio = profile.bio || '';
+  const currentPhoto = profile.photoURL || 'https://i.pravatar.cc/150?img=47';
+
+  openScreen('Edit Profile', `
+    <div style="display:flex;flex-direction:column;align-items:center;gap:16px;padding-bottom:30px;">
+      <div style="position:relative;cursor:pointer;" id="photoPickerWrap">
+        <img id="profilePhotoPreview" src="${currentPhoto}" style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:2px solid var(--saffron);">
+        <div style="position:absolute;bottom:0;right:0;background:var(--saffron);border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:14px;">📷</div>
+        <input type="file" id="photoFileInput" accept="image/*" style="display:none;">
+      </div>
+      <div style="font-size:11px;color:var(--text-faint);">Tap photo to change (max 500KB)</div>
+
+      <div style="width:100%;">
+        <div style="color:var(--text-dim);font-size:12px;margin-bottom:6px;">Display Name</div>
+        <input id="editName" type="text" value="${currentName}" maxlength="30"
+          style="width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:10px;padding:12px;color:white;font-size:14px;">
+      </div>
+
+      <div style="width:100%;">
+        <div style="color:var(--text-dim);font-size:12px;margin-bottom:6px;">Bio</div>
+        <textarea id="editBio" maxlength="100" rows="3"
+          style="width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:10px;padding:12px;color:white;font-size:14px;resize:none;">${currentBio}</textarea>
+      </div>
+
+      <div id="profileSaveError" style="color:#ff6b6b;font-size:12px;display:none;width:100%;"></div>
+
+      <button id="saveProfileBtn" style="width:100%;background:linear-gradient(90deg,var(--saffron),#ffb066);border:none;border-radius:10px;padding:13px;color:#1a0f00;font-weight:800;font-size:15px;">
+        Save Profile
+      </button>
+    </div>
+  `);
+
+  // Photo picker
+  const photoWrap = document.getElementById('photoPickerWrap');
+  const photoInput = document.getElementById('photoFileInput');
+  const photoPreview = document.getElementById('profilePhotoPreview');
+  let newPhotoBase64 = null;
+
+  photoWrap.addEventListener('click', () => photoInput.click());
+  photoInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    try {
+      newPhotoBase64 = await fileToBase64(file, 500);
+      photoPreview.src = newPhotoBase64;
+    } catch(err) {
+      document.getElementById('profileSaveError').textContent = err.message;
+      document.getElementById('profileSaveError').style.display = 'block';
+    }
+  });
+
+  // Save
+  document.getElementById('saveProfileBtn').addEventListener('click', async () => {
+    const btn = document.getElementById('saveProfileBtn');
+    const errEl = document.getElementById('profileSaveError');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    try {
+      const updates = {
+        displayName: document.getElementById('editName').value.trim() || currentName,
+        bio: document.getElementById('editBio').value.trim(),
+        email: acc.email,
+        uid: acc.uid,
+      };
+      if(newPhotoBase64) updates.photoURL = newPhotoBase64;
+      await saveUserProfile(acc.uid, updates);
+      showToast('Profile saved ✓');
+      screenOverlay.classList.remove('open');
+    } catch(err) {
+      errEl.textContent = 'Could not save. Try again.';
+      errEl.style.display = 'block';
+    }
+    btn.disabled = false; btn.textContent = 'Save Profile';
+  });
+}
+
+/* ---------- Create/Post screen ---------- */
+function openCreateScreen(){
+  openScreen('Create Post', `
+    <div style="display:flex;flex-direction:column;gap:16px;padding-bottom:30px;">
+      <div id="mediaPreviewArea" style="width:100%;height:200px;background:rgba(255,255,255,0.05);border:2px dashed rgba(255,255,255,0.2);border-radius:12px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--text-faint);font-size:13px;">
+        <div style="font-size:28px;">📷</div>
+        <div>Tap to select photo or video</div>
+      </div>
+      <input type="file" id="postFileInput" accept="image/*,video/*" style="display:none;">
+
+      <div style="display:flex;gap:10px;">
+        <button id="pickFromGallery" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:10px;padding:12px;color:white;font-size:13px;font-weight:600;">📁 Gallery</button>
+        <button id="pickFromCamera" style="flex:1;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:10px;padding:12px;color:white;font-size:13px;font-weight:600;">📷 Camera</button>
+      </div>
+
+      <div>
+        <div style="color:var(--text-dim);font-size:12px;margin-bottom:6px;">Caption</div>
+        <textarea id="postCaption" maxlength="150" rows="3" placeholder="Write a caption..."
+          style="width:100%;background:rgba(255,255,255,0.08);border:1px solid rgba(255,255,255,0.2);border-radius:10px;padding:12px;color:white;font-size:14px;resize:none;"></textarea>
+      </div>
+
+      <div id="postError" style="color:#ff6b6b;font-size:12px;display:none;"></div>
+
+      <button id="submitPostBtn" style="width:100%;background:linear-gradient(90deg,var(--saffron),#ffb066);border:none;border-radius:10px;padding:13px;color:#1a0f00;font-weight:800;font-size:15px;">
+        Post Now
+      </button>
+    </div>
+  `);
+
+  const fileInput = document.getElementById('postFileInput');
+  const previewArea = document.getElementById('mediaPreviewArea');
+  let mediaBase64 = null;
+  let mediaType = null;
+
+  function openFilePicker(capture = false){
+    fileInput.removeAttribute('capture');
+    if(capture) fileInput.setAttribute('capture', 'environment');
+    fileInput.click();
+  }
+
+  document.getElementById('pickFromGallery').addEventListener('click', () => openFilePicker(false));
+  document.getElementById('pickFromCamera').addEventListener('click', () => openFilePicker(true));
+  previewArea.addEventListener('click', () => openFilePicker(false));
+
+  fileInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if(!file) return;
+    const errEl = document.getElementById('postError');
+    errEl.style.display = 'none';
+
+    // Show preview
+    const url = URL.createObjectURL(file);
+    mediaType = file.type.startsWith('video') ? 'video' : 'image';
+
+    if(mediaType === 'image'){
+      try {
+        mediaBase64 = await fileToBase64(file, 800);
+        previewArea.innerHTML = `<img src="${mediaBase64}" style="width:100%;height:100%;object-fit:cover;border-radius:12px;">`;
+      } catch(err){
+        errEl.textContent = err.message;
+        errEl.style.display = 'block';
+      }
+    } else {
+      // Video — store URL temporarily, warn about size
+      if(file.size > 5 * 1024 * 1024){
+        errEl.textContent = 'Video too large (max 5MB). Please trim or compress it.';
+        errEl.style.display = 'block';
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = e2 => {
+        mediaBase64 = e2.target.result;
+        previewArea.innerHTML = `<video src="${url}" style="width:100%;height:100%;object-fit:cover;border-radius:12px;" controls muted playsinline></video>`;
+      };
+      reader.readAsDataURL(file);
+    }
+  });
+
+  document.getElementById('submitPostBtn').addEventListener('click', async () => {
+    const acc = getAccount();
+    if(!acc){ showToast('Please log in first'); return; }
+    if(!mediaBase64){ showToast('Please select a photo or video'); return; }
+
+    const btn = document.getElementById('submitPostBtn');
+    const errEl = document.getElementById('postError');
+    btn.disabled = true; btn.textContent = 'Posting...';
+
+    try {
+      const profile = await getUserProfile(acc.uid) || {};
+      await savePost(acc.uid, {
+        mediaBase64,
+        mediaType,
+        caption: document.getElementById('postCaption').value.trim(),
+        displayName: profile.displayName || acc.email.split('@')[0],
+        photoURL: profile.photoURL || '',
+        likes: 0,
+        comments: 0,
+      });
+      showToast('Posted successfully! ✓');
+      screenOverlay.classList.remove('open');
+    } catch(err) {
+      errEl.textContent = 'Could not post. Try again.';
+      errEl.style.display = 'block';
+    }
+    btn.disabled = false; btn.textContent = 'Post Now';
+  });
+}
+
 
 function getAccount(){
   try {
@@ -38,11 +273,20 @@ function saveAccountAndEnter(user){
     createdAt: Date.now()
   };
   localStorage.setItem('bp_account', JSON.stringify(account));
+  // Also keep Firebase Auth in sync so Firestore rules (request.auth) work
+  window._firebaseUser = user;
   showApp();
 }
 
 const existingAccount = getAccount();
 if (existingAccount){
+  // Restore Firebase Auth session for returning users
+  // so Firestore security rules (request.auth != null) work
+  firebase.auth().onAuthStateChanged((user) => {
+    if(user){
+      window._firebaseUser = user;
+    }
+  });
   showApp();
 } else {
   loginBtn.addEventListener('click', () => {
@@ -477,42 +721,63 @@ document.getElementById('navSearch').addEventListener('click', () => {
 });
 
 document.getElementById('navCreate').addEventListener('click', () => {
-  openScreen('Create New Reel', `
-    <div class="create-opt"><div class="ic">🎥</div><div><b>Record</b><span>Shoot directly with your camera</span></div></div>
-    <div class="create-opt"><div class="ic">🖼️</div><div><b>Choose from gallery</b><span>Upload a video you already have</span></div></div>
-    <div class="create-opt"><div class="ic">🎵</div><div><b>Trending sounds</b><span>Browse popular music</span></div></div>
-    ${emptyState('🎬','Upload is a demo feature right now','Connecting a real backend (like Firebase Storage) will make this work')}
-  `);
+  openCreateScreen();
 });
 
 document.getElementById('navLikes').addEventListener('click', () => {
   openScreen('Liked Reels', emptyState('❤️','No liked reels yet','Reels you like will show up here'));
 });
 
-document.getElementById('navProfile').addEventListener('click', () => {
+document.getElementById('navProfile').addEventListener('click', async () => {
   const acc = getAccount();
-  const avatarUrl = 'https://i.pravatar.cc/150?img=47';
-  const displayName = (acc && acc.email) ? acc.email.split('@')[0] : '@your.account';
-  const email = (acc && acc.email) ? acc.email : '';
-  openScreen('Profile', `
-    <div class="profile-top">
-      <img src="${avatarUrl}" alt="">
-      <div class="pname">${displayName}</div>
-      ${email ? `<div style="color:var(--text-faint);font-size:12px;margin-top:2px;">${email}</div>` : ''}
-      <div class="profile-stats">
-        <div><b>0</b><span>Reels</span></div>
-        <div><b>0</b><span>Followers</span></div>
-        <div><b>0</b><span>Following</span></div>
-      </div>
-    </div>
-    ${emptyState('🎞️','No reels posted yet','Post your first reel from the Create tab')}
-    <div style="text-align:center;margin-top:24px;">
-      <button id="logoutBtn" style="background:none;border:1px solid rgba(255,255,255,0.25);color:var(--white);padding:9px 20px;border-radius:8px;font-size:13px;font-weight:600;">Log out</button>
-    </div>
-    <div style="text-align:center;margin-top:26px;font-size:11px;color:var(--text-faint);line-height:1.6;">
-      Bharat Play<br>Founded &amp; owned by Nitin Sharma ✔
-    </div>
-  `);
+  const profile = acc ? (await getUserProfile(acc.uid) || {}) : {};
+  const displayName = profile.displayName || (acc ? acc.email.split('@')[0] : '@your.account');
+  const photoURL = profile.photoURL || 'https://i.pravatar.cc/150?img=47';
+  const bio = profile.bio || '';
+  const posts = acc ? await getUserPosts(acc.uid) : [];
+
+  let postsHTML = '';
+  if(posts.length > 0){
+    postsHTML = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-top:16px;">';
+    posts.forEach(p => {
+      postsHTML += '<div style="aspect-ratio:0.7;background:#111;border-radius:4px;overflow:hidden;">';
+      if(p.mediaType === 'video'){
+        postsHTML += '<video src="' + p.mediaBase64 + '" style="width:100%;height:100%;object-fit:cover;" muted playsinline></video>';
+      } else {
+        postsHTML += '<img src="' + p.mediaBase64 + '" style="width:100%;height:100%;object-fit:cover;">';
+      }
+      postsHTML += '</div>';
+    });
+    postsHTML += '</div>';
+  } else {
+    postsHTML = emptyState('🎞️','No posts yet','Post your first photo or video from the Create tab');
+  }
+
+  const bioHtml = bio ? '<div style="color:var(--text-dim);font-size:12px;text-align:center;margin-top:4px;">' + bio + '</div>' : '';
+
+  openScreen('Profile',
+    '<div class="profile-top">' +
+    '<img src="' + photoURL + '" alt="" style="width:80px;height:80px;border-radius:50%;border:2px solid var(--saffron);object-fit:cover;">' +
+    '<div class="pname">' + displayName + '</div>' +
+    bioHtml +
+    '<div class="profile-stats">' +
+    '<div><b>' + posts.length + '</b><span>Posts</span></div>' +
+    '<div><b>0</b><span>Followers</span></div>' +
+    '<div><b>0</b><span>Following</span></div>' +
+    '</div>' +
+    '<button id="editProfileBtn" style="margin-top:12px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.25);color:white;padding:8px 22px;border-radius:8px;font-size:13px;font-weight:600;">Edit Profile</button>' +
+    '</div>' +
+    postsHTML +
+    '<div style="text-align:center;margin-top:24px;">' +
+    '<button id="logoutBtn" style="background:none;border:1px solid rgba(255,255,255,0.2);color:var(--text-faint);padding:8px 18px;border-radius:8px;font-size:12px;">Log out</button>' +
+    '</div>' +
+    '<div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-faint);">Bharat Play — founded &amp; owned by Nitin Sharma ✔</div>'
+  );
+
+  document.getElementById('editProfileBtn').addEventListener('click', () => {
+    screenOverlay.classList.remove('open');
+    setTimeout(() => openProfileEdit(), 100);
+  });
   document.getElementById('logoutBtn').addEventListener('click', () => {
     localStorage.removeItem('bp_account');
     location.reload();
