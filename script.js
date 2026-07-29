@@ -79,16 +79,22 @@ async function openProfileEdit(){
   const profile = await getUserProfile(acc.uid) || {};
   const currentName = profile.displayName || acc.email.split('@')[0];
   const currentBio = profile.bio || '';
-  const currentPhoto = profile.photoURL || 'https://i.pravatar.cc/150?img=47';
+  const currentPhoto = profile.photoURL || '';
 
   openScreen('Edit Profile', `
     <div style="display:flex;flex-direction:column;align-items:center;gap:16px;padding-bottom:30px;">
       <div style="position:relative;cursor:pointer;" id="photoPickerWrap">
-        <img id="profilePhotoPreview" src="${currentPhoto}" style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:2px solid var(--saffron);">
+        ${currentPhoto
+          ? `<img id="profilePhotoPreview" src="${currentPhoto}" style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:2px solid var(--saffron);">`
+          : `<div id="profilePhotoPreview" style="width:90px;height:90px;border-radius:50%;border:2px solid var(--saffron);background:rgba(255,153,51,0.15);display:flex;align-items:center;justify-content:center;font-size:40px;">👤</div>`
+        }
         <div style="position:absolute;bottom:0;right:0;background:var(--saffron);border-radius:50%;width:26px;height:26px;display:flex;align-items:center;justify-content:center;font-size:14px;">📷</div>
         <input type="file" id="photoFileInput" accept="image/*" style="display:none;">
       </div>
-      <div style="font-size:11px;color:var(--text-faint);">Tap photo to change (max 500KB)</div>
+      <div style="display:flex;gap:10px;">
+        <div style="font-size:11px;color:var(--text-faint);">Tap to change (max 500KB)</div>
+        ${currentPhoto ? `<button id="removePhotoBtn" style="font-size:11px;color:#ff6b6b;background:none;border:none;cursor:pointer;">Remove photo</button>` : ''}
+      </div>
 
       <div style="width:100%;">
         <div style="color:var(--text-dim);font-size:12px;margin-bottom:6px;">Display Name</div>
@@ -115,19 +121,39 @@ async function openProfileEdit(){
   const photoInput = document.getElementById('photoFileInput');
   const photoPreview = document.getElementById('profilePhotoPreview');
   let newPhotoBase64 = null;
+  let removePhoto = false;
 
-  photoWrap.addEventListener('click', () => photoInput.click());
+  photoWrap.addEventListener('click', (e) => {
+    if(e.target.id === 'removePhotoBtn') return;
+    photoInput.click();
+  });
   photoInput.addEventListener('change', async (e) => {
     const file = e.target.files[0];
     if(!file) return;
     try {
       newPhotoBase64 = await fileToBase64(file, 500);
-      photoPreview.src = newPhotoBase64;
+      removePhoto = false;
+      if(photoPreview.tagName === 'IMG') photoPreview.src = newPhotoBase64;
+      else photoPreview.outerHTML = `<img id="profilePhotoPreview" src="${newPhotoBase64}" style="width:90px;height:90px;border-radius:50%;object-fit:cover;border:2px solid var(--saffron);">`;
     } catch(err) {
       document.getElementById('profileSaveError').textContent = err.message;
       document.getElementById('profileSaveError').style.display = 'block';
     }
   });
+
+  const removeBtnEl = document.getElementById('removePhotoBtn');
+  if(removeBtnEl){
+    removeBtnEl.addEventListener('click', (e) => {
+      e.stopPropagation();
+      removePhoto = true;
+      newPhotoBase64 = null;
+      // Show default avatar placeholder
+      const wrap = document.getElementById('photoPickerWrap');
+      const existing = wrap.querySelector('img, div#profilePhotoPreview');
+      if(existing) existing.outerHTML = `<div id="profilePhotoPreview" style="width:90px;height:90px;border-radius:50%;border:2px solid var(--saffron);background:rgba(255,153,51,0.15);display:flex;align-items:center;justify-content:center;font-size:40px;">👤</div>`;
+      removeBtnEl.style.display = 'none';
+    });
+  }
 
   // Save
   document.getElementById('saveProfileBtn').addEventListener('click', async () => {
@@ -142,6 +168,7 @@ async function openProfileEdit(){
         uid: acc.uid,
       };
       if(newPhotoBase64) updates.photoURL = newPhotoBase64;
+      if(removePhoto) updates.photoURL = '';
       console.log('Saving profile for uid:', acc.uid, updates.displayName);
       await saveUserProfile(acc.uid, updates);
       console.log('Profile saved successfully');
@@ -787,7 +814,8 @@ document.getElementById('navProfile').addEventListener('click', async () => {
   const acc = getAccount();
   const profile = acc ? (await getUserProfile(acc.uid) || {}) : {};
   const displayName = profile.displayName || (acc ? acc.email.split('@')[0] : '@your.account');
-  const photoURL = profile.photoURL || 'https://i.pravatar.cc/150?img=47';
+  // Blank avatar if no photo set
+  const photoURL = profile.photoURL || '';
   const bio = profile.bio || '';
   const posts = acc ? await getUserPosts(acc.uid) : [];
 
@@ -795,12 +823,13 @@ document.getElementById('navProfile').addEventListener('click', async () => {
   if(posts.length > 0){
     postsHTML = '<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:2px;margin-top:16px;">';
     posts.forEach(p => {
-      postsHTML += '<div style="aspect-ratio:0.7;background:#111;border-radius:4px;overflow:hidden;">';
+      postsHTML += `<div class="post-thumb" data-id="${p.id}" style="aspect-ratio:0.7;background:#111;border-radius:4px;overflow:hidden;position:relative;">`;
       if(p.mediaType === 'video'){
-        postsHTML += '<video src="' + p.mediaBase64 + '" style="width:100%;height:100%;object-fit:cover;" muted playsinline></video>';
+        postsHTML += `<video src="${p.mediaBase64}" style="width:100%;height:100%;object-fit:cover;" muted playsinline></video>`;
       } else {
-        postsHTML += '<img src="' + p.mediaBase64 + '" style="width:100%;height:100%;object-fit:cover;">';
+        postsHTML += `<img src="${p.mediaBase64}" style="width:100%;height:100%;object-fit:cover;">`;
       }
+      postsHTML += `<div class="post-delete-btn" data-id="${p.id}" style="position:absolute;top:4px;right:4px;background:rgba(0,0,0,0.6);border-radius:50%;width:22px;height:22px;display:flex;align-items:center;justify-content:center;font-size:12px;cursor:pointer;">🗑️</div>`;
       postsHTML += '</div>';
     });
     postsHTML += '</div>';
@@ -808,25 +837,30 @@ document.getElementById('navProfile').addEventListener('click', async () => {
     postsHTML = emptyState('🎞️','No posts yet','Post your first photo or video from the Create tab');
   }
 
-  const bioHtml = bio ? '<div style="color:var(--text-dim);font-size:12px;text-align:center;margin-top:4px;">' + bio + '</div>' : '';
+  const bioHtml = bio ? `<div style="color:var(--text-dim);font-size:12px;text-align:center;margin-top:4px;">${bio}</div>` : '';
+
+  // Avatar HTML - blank circle if no photo
+  const avatarHTML = photoURL
+    ? `<img src="${photoURL}" alt="" style="width:80px;height:80px;border-radius:50%;border:2px solid var(--saffron);object-fit:cover;">`
+    : `<div style="width:80px;height:80px;border-radius:50%;border:2px solid var(--saffron);background:rgba(255,153,51,0.15);display:flex;align-items:center;justify-content:center;font-size:32px;">👤</div>`;
 
   openScreen('Profile',
-    '<div class="profile-top">' +
-    '<img src="' + photoURL + '" alt="" style="width:80px;height:80px;border-radius:50%;border:2px solid var(--saffron);object-fit:cover;">' +
-    '<div class="pname">' + displayName + '</div>' +
-    bioHtml +
-    '<div class="profile-stats">' +
-    '<div><b>' + posts.length + '</b><span>Posts</span></div>' +
-    '<div><b>0</b><span>Followers</span></div>' +
-    '<div><b>0</b><span>Following</span></div>' +
-    '</div>' +
-    '<button id="editProfileBtn" style="margin-top:12px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.25);color:white;padding:8px 22px;border-radius:8px;font-size:13px;font-weight:600;">Edit Profile</button>' +
-    '</div>' +
-    postsHTML +
-    '<div style="text-align:center;margin-top:24px;">' +
-    '<button id="logoutBtn" style="background:none;border:1px solid rgba(255,255,255,0.2);color:var(--text-faint);padding:8px 18px;border-radius:8px;font-size:12px;">Log out</button>' +
-    '</div>' +
-    '<div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-faint);">Bharat Play — founded &amp; owned by Nitin Sharma ✔</div>'
+    `<div class="profile-top">
+      ${avatarHTML}
+      <div class="pname">${displayName}</div>
+      ${bioHtml}
+      <div class="profile-stats">
+        <div><b>${posts.length}</b><span>Posts</span></div>
+        <div><b>0</b><span>Followers</span></div>
+        <div><b>0</b><span>Following</span></div>
+      </div>
+      <button id="editProfileBtn" style="margin-top:12px;background:rgba(255,255,255,0.1);border:1px solid rgba(255,255,255,0.25);color:white;padding:8px 22px;border-radius:8px;font-size:13px;font-weight:600;">Edit Profile</button>
+    </div>
+    ${postsHTML}
+    <div style="text-align:center;margin-top:24px;">
+      <button id="logoutBtn" style="background:none;border:1px solid rgba(255,255,255,0.2);color:var(--text-faint);padding:8px 18px;border-radius:8px;font-size:12px;">Log out</button>
+    </div>
+    <div style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-faint);">Bharat Play — founded &amp; owned by Nitin Sharma ✔</div>`
   );
 
   document.getElementById('editProfileBtn').addEventListener('click', () => {
@@ -836,6 +870,25 @@ document.getElementById('navProfile').addEventListener('click', async () => {
   document.getElementById('logoutBtn').addEventListener('click', () => {
     localStorage.removeItem('bp_account');
     location.reload();
+  });
+
+  // Delete post buttons
+  document.querySelectorAll('.post-delete-btn').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const postId = btn.dataset.id;
+      if(!confirm('Delete this post?')) return;
+      try {
+        await db.collection('posts').doc(postId).delete();
+        showToast('Post deleted ✓');
+        // Remove from grid
+        const thumb = document.querySelector(`.post-thumb[data-id="${postId}"]`);
+        if(thumb) thumb.remove();
+      } catch(err) {
+        console.error('Delete error:', err);
+        showToast('Could not delete. Try again.');
+      }
+    });
   });
 });
 
