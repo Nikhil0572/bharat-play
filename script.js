@@ -50,9 +50,12 @@ async function savePost(uid, post){
 
 async function getUserPosts(uid){
   try {
-    const snap = await db.collection('posts').where('uid','==',uid).orderBy('createdAt','desc').limit(20).get();
+    const snap = await db.collection('posts').where('uid','==',uid).limit(20).get();
     return snap.docs.map(d => ({ id: d.id, ...d.data() }));
-  } catch(e){ return []; }
+  } catch(e){
+    console.error('getUserPosts error:', e);
+    return [];
+  }
 }
 
 /* ---------- Image to base64 helper ---------- */
@@ -139,11 +142,14 @@ async function openProfileEdit(){
         uid: acc.uid,
       };
       if(newPhotoBase64) updates.photoURL = newPhotoBase64;
+      console.log('Saving profile for uid:', acc.uid, updates.displayName);
       await saveUserProfile(acc.uid, updates);
+      console.log('Profile saved successfully');
       showToast('Profile saved ✓');
       screenOverlay.classList.remove('open');
     } catch(err) {
-      errEl.textContent = 'Could not save. Try again.';
+      console.error('Save profile error:', err.code, err.message);
+      errEl.textContent = 'Error: ' + (err.message || 'Could not save. Try again.');
       errEl.style.display = 'block';
     }
     btn.disabled = false; btn.textContent = 'Save Profile';
@@ -707,6 +713,39 @@ function openMore(r){
   });
 }
 
+/* ---------- Stop audio when leaving feed ---------- */
+function stopAllMedia(){
+  document.querySelectorAll('.reel video').forEach(v => v.pause());
+  document.querySelectorAll('.reel iframe').forEach(iframe => {
+    if(iframe.src && iframe.src !== 'about:blank'){
+      iframe.src = 'about:blank';
+    }
+  });
+}
+
+/* ---------- Pull to refresh ---------- */
+let ptStartY = 0;
+let ptPulling = false;
+const feedEl = document.getElementById('feed');
+
+feedEl.addEventListener('touchstart', (e) => {
+  if(feedEl.scrollTop === 0) ptStartY = e.touches[0].clientY;
+}, { passive: true });
+
+feedEl.addEventListener('touchmove', (e) => {
+  if(feedEl.scrollTop === 0 && e.touches[0].clientY - ptStartY > 60){
+    ptPulling = true;
+  }
+}, { passive: true });
+
+feedEl.addEventListener('touchend', () => {
+  if(ptPulling){
+    ptPulling = false;
+    showToast('Refreshing...');
+    setTimeout(() => location.reload(), 400);
+  }
+});
+
 /* ---------- Full screen panels ---------- */
 const screenOverlay = document.getElementById('screenOverlay');
 const screenTitle = document.getElementById('screenTitle');
@@ -726,6 +765,7 @@ function emptyState(icon, title, sub){
 }
 
 document.getElementById('navSearch').addEventListener('click', () => {
+  stopAllMedia();
   openScreen('Search', `
     <input class="search-input" placeholder="Search reels, people, hashtags...">
     ${emptyState('🔍','Search something','Type a name, hashtag, or sound to find reels')}
@@ -733,14 +773,17 @@ document.getElementById('navSearch').addEventListener('click', () => {
 });
 
 document.getElementById('navCreate').addEventListener('click', () => {
+  stopAllMedia();
   openCreateScreen();
 });
 
 document.getElementById('navLikes').addEventListener('click', () => {
+  stopAllMedia();
   openScreen('Liked Reels', emptyState('❤️','No liked reels yet','Reels you like will show up here'));
 });
 
 document.getElementById('navProfile').addEventListener('click', async () => {
+  stopAllMedia();
   const acc = getAccount();
   const profile = acc ? (await getUserProfile(acc.uid) || {}) : {};
   const displayName = profile.displayName || (acc ? acc.email.split('@')[0] : '@your.account');
