@@ -22,18 +22,30 @@ async function getUserProfile(uid){
 }
 
 async function saveUserProfile(uid, data){
-  await db.collection('users').doc(uid).set(data, { merge: true });
-  // Update localStorage too
-  const acc = getAccount();
-  if(acc){ localStorage.setItem('bp_account', JSON.stringify({ ...acc, ...data })); }
+  try {
+    await db.collection('users').doc(uid).set(data, { merge: true });
+    // Update localStorage too
+    const acc = getAccount();
+    if(acc){ localStorage.setItem('bp_account', JSON.stringify({ ...acc, ...data })); }
+    return true;
+  } catch(e){
+    console.error('saveUserProfile error:', e);
+    throw e;
+  }
 }
 
 async function savePost(uid, post){
-  await db.collection('posts').add({
-    uid,
-    ...post,
-    createdAt: firebase.firestore.FieldValue.serverTimestamp()
-  });
+  try {
+    await db.collection('posts').add({
+      uid,
+      ...post,
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    return true;
+  } catch(e){
+    console.error('savePost error:', e);
+    throw e;
+  }
 }
 
 async function getUserPosts(uid){
@@ -280,14 +292,14 @@ function saveAccountAndEnter(user){
 
 const existingAccount = getAccount();
 if (existingAccount){
-  // Restore Firebase Auth session for returning users
-  // so Firestore security rules (request.auth != null) work
+  // Wait for Firebase Auth to restore the session before showing app
+  // so Firestore rules (request.auth != null) work correctly
   firebase.auth().onAuthStateChanged((user) => {
     if(user){
       window._firebaseUser = user;
     }
+    showApp();
   });
-  showApp();
 } else {
   loginBtn.addEventListener('click', () => {
     const email = emailInput.value.trim();
