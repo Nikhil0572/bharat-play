@@ -710,7 +710,7 @@ async function openComments(r){
   // Show sheet immediately with loading state
   openSheet(`
     <div class="sheet-title">Comments</div>
-    <div id="commentsListEl" style="min-height:80px;display:flex;align-items:center;justify-content:center;">
+    <div id="commentsListEl" style="min-height:80px;display:flex;flex-direction:column;">
       <div style="color:var(--text-faint);font-size:13px;">Loading comments...</div>
     </div>
     <div class="comments-input-row">
