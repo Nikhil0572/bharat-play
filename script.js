@@ -392,7 +392,8 @@ const FOUNDER_REEL = {
   type: "local",
   src: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4",
   user: "nitinsharma", tag: "Founder", verified: true,
-  caption: "Welcome to Bharat Play 🇮🇳 India ka apna short video app! #bharatplay #founder",
+  isOwner: true,
+  caption: "Welcome to Bharat Play 🇮🇳 India ka apna short video app! Scroll karo, enjoy karo. #bharatplay #founder",
   sound: "Nitin Sharma - Original audio",
   avatar: "https://i.pravatar.cc/100?img=68",
   likes: "540K", comments: "12.3K", shares: "8.9K"
@@ -476,6 +477,17 @@ function buildReelEl(r){
     el.innerHTML = `
       <video src="${r.src}" loop playsinline muted preload="metadata"></video>
       <div class="reel-shade"></div>
+      ${r.isOwner ? `
+      <div style="position:absolute;bottom:72px;left:0;right:0;z-index:16;pointer-events:auto;">
+        <div style="background:linear-gradient(135deg,rgba(255,153,51,0.95),rgba(18,136,7,0.95));padding:10px 14px;display:flex;align-items:center;gap:10px;margin:0 0;">
+          <img src="${r.avatar}" style="width:38px;height:38px;border-radius:50%;border:2px solid white;object-fit:cover;" alt="">
+          <div style="flex:1;">
+            <div style="color:white;font-weight:800;font-size:13px;">Nitin Sharma ✔</div>
+            <div style="color:rgba(255,255,255,0.85);font-size:11px;">Founder & Owner — Bharat Play 🇮🇳</div>
+          </div>
+          <div style="background:white;color:#1a0f00;border-radius:6px;padding:5px 11px;font-weight:800;font-size:12px;">Follow</div>
+        </div>
+      </div>` : ''}
       <div class="rail">
         <div class="rail-item"><div class="rail-avatar"><img src="${r.avatar}" alt=""></div></div>
         <div class="rail-item like-item"><div class="rail-btn">${heartIcon(false)}</div><div class="rail-count">${r.likes}</div></div>
@@ -704,28 +716,37 @@ function openComments(r){
       </div>
     </div>
   `).join('');
-  openSheet(`<div class="sheet-title">${r.comments} Comments</div>${rows}
-    <div style="font-size:12px;color:var(--text-faint);text-align:center;margin-top:10px;">
-      Posting comments will work once a backend is connected
+  openSheet(`
+    <div class="sheet-title">${r.comments} Comments</div>
+    <div id="commentsListEl">${rows}</div>
+    <div class="comments-input-row">
+      <input class="comments-input" id="commentInput" placeholder="Add a comment..." maxlength="150">
+      <button class="comments-send-btn" id="commentSendBtn">Post</button>
     </div>`);
-}
-function openShare(r){
-  const opts = [
-    ["💬","WhatsApp"], ["📋","Copy link"], ["📩","Message"], ["📸","Instagram"], ["👥","Friends"], ["⋯","More"]
-  ];
-  const grid = opts.map(([icon,label]) => `
-    <div class="share-opt" data-label="${label}">
-      <div class="share-circle">${icon}</div>
-      <span>${label}</span>
-    </div>
-  `).join('');
-  openSheet(`<div class="sheet-title">Share @${r.user}'s reel</div><div class="share-grid">${grid}</div>`);
-  sheetContent.querySelectorAll('.share-opt').forEach(opt => {
-    opt.addEventListener('click', () => {
-      closeSheet();
-      showToast(`Shared via ${opt.dataset.label} (demo)`);
-    });
+  document.getElementById('commentSendBtn').addEventListener('click', () => {
+    const val = document.getElementById('commentInput').value.trim();
+    if(!val) return;
+    const acc = getAccount();
+    const name = acc ? acc.email.split('@')[0] : 'you';
+    const newRow = `<div class="comment-row"><img src="https://i.pravatar.cc/60?img=47" alt=""><div><div class="comment-user">@${name}</div><div class="comment-text">${val}</div></div></div>`;
+    document.getElementById('commentsListEl').insertAdjacentHTML('beforeend', newRow);
+    document.getElementById('commentInput').value = '';
+    showToast('Comment posted ✓');
   });
+}
+
+function openShare(r){
+  const shareUrl = r.videoId
+    ? `https://www.youtube.com/watch?v=${r.videoId}`
+    : 'https://bharat-play-two.vercel.app/';
+  const shareText = (r.caption || 'Check this out on Bharat Play!').substring(0,100);
+  if(navigator.share){
+    navigator.share({ title:'Bharat Play', text:shareText, url:shareUrl }).catch(()=>{});
+    return;
+  }
+  navigator.clipboard.writeText(shareUrl)
+    .then(() => showToast('Link copied! 📋'))
+    .catch(() => showToast('Share: ' + shareUrl));
 }
 function openMore(r){
   openSheet(`
