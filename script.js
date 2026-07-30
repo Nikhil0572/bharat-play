@@ -706,23 +706,58 @@ const SAMPLE_COMMENTS = [
   { user: "priya.here", text: "When is the next part coming?", avatar: "https://i.pravatar.cc/60?img=9" },
   { user: "dev.codes", text: "Bharat Play is the best app 🇮🇳", avatar: "https://i.pravatar.cc/60?img=14" },
 ];
-function openComments(r){
-  const rows = SAMPLE_COMMENTS.map(c => `
-    <div class="comment-row">
-      <img src="${c.avatar}" alt="">
-      <div>
-        <div class="comment-user">@${c.user}</div>
-        <div class="comment-text">${c.text}</div>
-      </div>
-    </div>
-  `).join('');
+async function openComments(r){
+  // Show sheet immediately with loading state
   openSheet(`
-    <div class="sheet-title">${r.comments} Comments</div>
-    <div id="commentsListEl">${rows}</div>
+    <div class="sheet-title">Comments</div>
+    <div id="commentsListEl" style="min-height:80px;display:flex;align-items:center;justify-content:center;">
+      <div style="color:var(--text-faint);font-size:13px;">Loading comments...</div>
+    </div>
     <div class="comments-input-row">
       <input class="comments-input" id="commentInput" placeholder="Add a comment..." maxlength="150">
       <button class="comments-send-btn" id="commentSendBtn">Post</button>
     </div>`);
+
+  const listEl = document.getElementById('commentsListEl');
+
+  // Fetch real YouTube comments if it's a YouTube reel
+  if(r.videoId){
+    try {
+      const res = await fetch(`https://www.googleapis.com/youtube/v3/commentThreads?part=snippet&videoId=${r.videoId}&maxResults=20&order=relevance&key=${YOUTUBE_API_KEY}`);
+      const data = await res.json();
+      if(data.items && data.items.length > 0){
+        const rows = data.items.map(item => {
+          const c = item.snippet.topLevelComment.snippet;
+          return `<div class="comment-row">
+            <img src="${c.authorProfileImageUrl}" alt="" onerror="this.src='https://i.pravatar.cc/60?img=5'">
+            <div>
+              <div class="comment-user">${c.authorDisplayName}</div>
+              <div class="comment-text">${c.textDisplay.replace(/<[^>]*>/g,'').substring(0,120)}</div>
+              <div style="font-size:10px;color:var(--text-faint);margin-top:2px;">❤️ ${c.likeCount > 0 ? c.likeCount : ''}</div>
+            </div>
+          </div>`;
+        }).join('');
+        listEl.innerHTML = rows;
+      } else if(data.error){
+        // Comments disabled on this video
+        listEl.innerHTML = `<div style="color:var(--text-faint);font-size:12px;text-align:center;padding:20px;">Comments are disabled for this video.</div>`;
+      } else {
+        listEl.innerHTML = `<div style="color:var(--text-faint);font-size:12px;text-align:center;padding:20px;">No comments yet.</div>`;
+      }
+    } catch(e){
+      listEl.innerHTML = `<div style="color:var(--text-faint);font-size:12px;text-align:center;padding:20px;">Could not load comments.</div>`;
+    }
+  } else {
+    // Local/user post — show sample comments
+    const rows = SAMPLE_COMMENTS.map(c => `
+      <div class="comment-row">
+        <img src="${c.avatar}" alt="">
+        <div><div class="comment-user">@${c.user}</div><div class="comment-text">${c.text}</div></div>
+      </div>`).join('');
+    listEl.innerHTML = rows;
+  }
+
+  // Add comment input handler
   document.getElementById('commentSendBtn').addEventListener('click', () => {
     const val = document.getElementById('commentInput').value.trim();
     if(!val) return;
